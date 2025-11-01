@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Assistant Settings</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#1b1c23] text-gray-100 font-sans h-screen flex">
+
+  <!-- Sidebar -->
+  <div class="w-72 bg-[#12131a] p-5 flex flex-col justify-between">
+    <div>
+      <h2 class="text-xl font-semibold mb-6">AI Assistant</h2>
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <p class="text-lg font-medium">saurabh’s iPhone</p>
+          <p class="text-sm text-gray-400">Disconnected</p>
+        </div>
+        <div class="w-3 h-3 bg-gray-500 rounded-full"></div>
+      </div>
+      <button class="w-full bg-[#23242b] text-sm py-2 rounded-lg mb-6 hover:bg-[#2e2f38] transition">
+        Share files between your devices ✨
+      </button>
+
+      <h3 class="text-gray-400 text-sm uppercase mb-2">Notifications</h3>
+      <div class="text-gray-500 text-sm">No new notifications</div>
+    </div>
+
+    <div class="text-xs text-gray-500 text-center">AI Assistant v1.0.0</div>
+  </div>
+
+  <!-- Main Section -->
+  <div class="flex-1 flex flex-col items-center justify-center bg-[#1e1f28] text-center">
+    <div class="mb-6">
+      <div class="relative inline-block">
+        <div class="w-24 h-24 rounded-2xl bg-[#292a33] flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m-2 8a9 9 0 100-18 9 9 0 000 18z" />
+          </svg>
+        </div>
+        <div class="absolute -top-2 -right-2 bg-pink-500 w-5 h-5 flex items-center justify-center rounded-full text-sm font-bold">!</div>
+      </div>
+    </div>
+
+    <h1 class="text-2xl font-semibold mb-2">We weren’t able to connect your mobile device</h1>
+    <p class="text-gray-400 max-w-md mb-6">
+      On both your PC and mobile device, try toggling Bluetooth off and on again.
+      After this, click <span class="text-gray-300 font-semibold">Try again</span> to resume set-up.
+    </p>
+
+    <button class="bg-pink-500 hover:bg-pink-600 text-white px-6 py-2 rounded-lg font-medium mb-4 transition">
+      Try again
+    </button>
+
+    <a href="#" class="text-gray-400 hover:text-gray-300 text-sm underline">
+      Learn more about how to connect
+    </a>
+  </div>
+
+</body>
+</html>
