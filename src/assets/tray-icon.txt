@@ -1,0 +1,3 @@
+This file is a placeholder for the tray icon.
+You need to add a 16x16 PNG icon file named "tray-icon.png" in this directory.
+You can create a simple icon or download one from an icon library.

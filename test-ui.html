@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test UI</title>
+    <link rel="stylesheet" href="src/ui/styles.css">
+</head>
+<body>
+    <div id="app">
+        <div id="search-container" class="search-container">
+            <div class="search-box">
+                <input 
+                    type="text" 
+                    id="search-input" 
+                    placeholder="Test input..."
+                    value="what is openai?"
+                >
+                <button id="search-btn" class="search-btn">Search</button>
+            </div>
+        </div>
+
+        <div id="results-container" class="results-container">
+            <div id="results-content" class="results-content">
+                <div class="ai-response">
+                    <div class="response-header">
+                        🤖 AI Assistant
+                    </div>
+                    <div class="response-content">
+                        OpenAI is an artificial intelligence research lab that focuses on developing advanced AI models and technologies. They are known for creating powerful language models like **GPT-3**. If you are interested in AI or looking to explore cutting-edge technologies, keeping up with OpenAI's latest developments could be beneficial.
+                    </div>
+                </div>
+            </div>
+            <div class="results-actions">
+                <button id="close-btn" class="action-btn">Close</button>
+                <button id="copy-btn" class="action-btn">Copy</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

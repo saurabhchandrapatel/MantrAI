@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Settings</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0; padding: 0; background: #f8f9fa; color: #333;
+        }
+        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { margin: 0; color: #2c3e50; font-size: 2.5em; }
+        .header p { color: #666; margin-top: 10px; }
+        
+        .tabs { display: flex; background: white; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; border-radius: 8px; transition: all 0.3s; }
+        .tab:hover { background: #f0f0f0; }
+        .tab.active { background: #007acc; color: white; }
+        
+        .tab-content { display: none; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .tab-content.active { display: block; }
+        
+        .section { margin-bottom: 30px; }
+        .section h3 { margin: 0 0 15px 0; color: #2c3e50; font-size: 1.2em; }
+        .setting-group { margin-bottom: 20px; }
+        .setting-row { display: flex; gap: 20px; align-items: center; }
+        .setting-row .setting-group { flex: 1; margin-bottom: 0; }
+        input#openai-key, input#reportTime  {width: 95%;}
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
+        select, input { width: 100%; padding: 12px; border: 2px solid #e1e5e9; border-radius: 6px; font-size: 14px; transition: border-color 0.3s; }
+        select:focus, input:focus { outline: none; border-color: #007acc; }
+        
+        .toggle { display: flex; align-items: center; gap: 10px; }
+        .switch { position: relative; width: 50px; height: 24px; background: #ccc; border-radius: 12px; cursor: pointer; transition: 0.3s; }
+        .switch.active { background: #007acc; }
+        .switch::before { content: ''; position: absolute; width: 20px; height: 20px; background: white; border-radius: 50%; top: 2px; left: 2px; transition: 0.3s; }
+        .switch.active::before { transform: translateX(26px); }
+        
+        .provider-config { display: none; margin-top: 15px; padding: 20px; background: #f8f9fa; border-radius: 6px; }
+        .provider-config.active { display: block; }
+        
+        .buttons { display: flex; gap: 15px; margin-top: 30px; }
+        .btn { padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.3s; }
+        .btn-primary { background: #007acc; color: white; }
+        .btn-primary:hover { background: #005a9e; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #545b62; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
+        
+        .info-box { background: #e8f4fd; border-left: 4px solid #007acc; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+        .warning-box { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚙️ Settings</h1>
+            <p>Configure your AI assistant and productivity tracking preferences</p>
+        </div>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('ai')">🤖 AI Assistant</div>
+            <div class="tab" onclick="switchTab('tracking')">📊 Tracking</div>
+            <div class="tab" onclick="switchTab('notifications')">🔔 Notifications</div>
+            <div class="tab" onclick="switchTab('privacy')">🔒 Privacy</div>
+        </div>
+        
+        <div id="ai-tab" class="tab-content active">
+            <div class="section">
+                <h3>LLM Provider Configuration</h3>
+                <div class="info-box">
+                    Choose your preferred AI provider. OpenAI requires an API key, Ollama runs locally, and LLM Proxy allows custom endpoints.
+                </div>
+                
+                <div class="setting-group">
+                    <label for="provider">AI Provider:</label>
+                    <select id="provider">
+                        <option value="openai">OpenAI (GPT-3.5/GPT-4)</option>
+                        <option value="ollama">Ollama (Local)</option>
+                        <option value="proxy">Custom LLM Proxy</option>
+                    </select>
+                </div>
+
+                <div id="openai-config" class="provider-config active">
+                    <div class="setting-row">
+                        <div class="setting-group">
+                            <label for="openai-key">API Key:</label>
+                            <input type="password" id="openai-key" placeholder="sk-...">
+                        </div>
+                        <div class="setting-group">
+                            <label for="openai-model">Model:</label>
+                            <select id="openai-model">
+                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                <option value="gpt-4">GPT-4</option>
+                                <option value="gpt-4-turbo">GPT-4 Turbo</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="ollama-config" class="provider-config">
+                    <div class="setting-row">
+                        <div class="setting-group">
+                            <label for="ollama-url">Ollama URL:</label>
+                            <input type="text" id="ollama-url" value="http://localhost:11434" placeholder="http://localhost:11434">
+                        </div>
+                        <div class="setting-group">
+                            <label for="ollama-model">Model:</label>
+                            <input type="text" id="ollama-model" value="llama2" placeholder="llama2, codellama, mistral">
+                        </div>
+                    </div>
+                </div>
+
+                <div id="proxy-config" class="provider-config">
+                    <div class="setting-row">
+                        <div class="setting-group">
+                            <label for="proxy-url">Proxy URL:</label>
+                            <input type="text" id="proxy-url" placeholder="http://localhost:8080">
+                        </div>
+                        <div class="setting-group">
+                            <label for="proxy-key">API Key (Optional):</label>
+                            <input type="password" id="proxy-key" placeholder="Leave empty if not required">
+                        </div>
+                    </div>
+                </div>
+            </div>
+             <div class="buttons">
+                <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+                <button class="btn btn-success" onclick="testConnection()">🔗 Test Connection</button>
+                <button class="btn btn-secondary" onclick="resetDefaults()">🔄 Reset to Defaults</button>
+            </div>
+            
+        </div>
+        
+        <div id="tracking-tab" class="tab-content">
+            <div class="section">
+                <h3>Activity Tracking</h3>
+                <div class="setting-group">
+                    <div class="toggle">
+                        <div class="switch active" id="trackingEnabled"></div>
+                        <label>Enable activity tracking</label>
+                    </div>
+                </div>
+                
+                <div class="setting-row">
+                    <div class="setting-group">
+                        <label for="trackingInterval">Tracking Interval:</label>
+                        <select id="trackingInterval">
+                            <option value="5">5 seconds</option>
+                            <option value="10" selected>10 seconds</option>
+                            <option value="30">30 seconds</option>
+                            <option value="60">1 minute</option>
+                        </select>
+                    </div>
+                    <div class="setting-group">
+                        <label for="idleThreshold">Idle Threshold:</label>
+                        <select id="idleThreshold">
+                            <option value="60">1 minute</option>
+                            <option value="300" selected>5 minutes</option>
+                            <option value="600">10 minutes</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="section">
+                <h3>App Categories</h3>
+                <div class="warning-box">
+                    Customize how applications are categorized for productivity scoring.
+                </div>
+                <div class="setting-group">
+                    <label for="productiveApps">Productive Apps (comma-separated):</label>
+                    <input type="text" id="productiveApps" value="code, visual studio, intellij, sublime, atom, vim, terminal, cmd, powershell" placeholder="vs code, intellij, terminal...">
+                </div>
+                <div class="setting-group">
+                    <label for="distractingApps">Distracting Apps (comma-separated):</label>
+                    <input type="text" id="distractingApps" value="youtube, facebook, twitter, instagram, tiktok, netflix, games" placeholder="youtube, facebook, games...">
+                </div>
+            </div>
+
+
+            <div class="buttons">
+                <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+            </div>
+
+        </div>
+        
+        <div id="notifications-tab" class="tab-content">
+            <div class="section">
+                <h3>Notification Preferences</h3>
+                <div class="setting-group">
+                    <div class="toggle">
+                        <div class="switch active" id="dailyReports"></div>
+                        <label>Daily productivity reports</label>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <div class="toggle">
+                        <div class="switch" id="breakReminders"></div>
+                        <label>Break reminders</label>
+                    </div>
+                </div>
+                <div class="setting-group">
+                    <div class="toggle">
+                        <div class="switch active" id="focusAlerts"></div>
+                        <label>Focus session alerts</label>
+                    </div>
+                </div>
+                
+                <div class="setting-row">
+                    <div class="setting-group">
+                        <label for="reportTime">Daily Report Time:</label>
+                        <input type="time" id="reportTime" value="18:00">
+                    </div>
+                    <div class="setting-group">
+                        <label for="breakInterval">Break Reminder Interval:</label>
+                        <select id="breakInterval">
+                            <option value="30">30 minutes</option>
+                            <option value="60" selected>1 hour</option>
+                            <option value="90">1.5 hours</option>
+                            <option value="120">2 hours</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="buttons">
+                <button class="btn btn-primary" onclick="saveSettings()">💾 Save Settings</button>
+            </div>
+
+        </div>
+        
+        <div id="privacy-tab" class="tab-content">
+            <div class="section">
+                <h3>Data Privacy</h3>
+                <div class="info-box">
+                    All data is stored locally on your machine. No information is sent to external servers unless you explicitly use cloud AI services.
+                </div>
+                
+                <div class="setting-group">
+                    <div class="toggle">
+                        <div class="switch" id="shareAnalytics"></div>
+                        <label>Share anonymous usage analytics</label>
+                    </div>
+                </div>
+                
+                <div class="setting-group">
+                    <label for="dataRetention">Data Retention Period:</label>
+                    <select id="dataRetention">
+                        <option value="30">30 days</option>
+                        <option value="90" selected>90 days</option>
+                        <option value="180">6 months</option>
+                        <option value="365">1 year</option>
+                        <option value="0">Keep forever</option>
+                    </select>
+                </div>
+                
+                <div class="buttons">
+                    <button class="btn btn-secondary" onclick="exportData()">Export Data</button>
+                    <button class="btn btn-secondary" onclick="clearData()">Clear All Data</button>
+                </div>
+            </div>
+        </div>
+        
+       
+    </div>
+
+    <script src="settings.js"></script>
+</body>
+</html>
