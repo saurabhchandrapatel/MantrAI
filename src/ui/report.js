@@ -1,100 +1,104 @@
 const { ipcRenderer } = require('electron');
 
-const mockData = {
-    today: {
-        productivityScore: 73,
-        totalTime: '6h 42m',
-        productiveTime: '4h 15m',
-        distractingTime: '1h 23m',
-        loginTime: '8:30 AM',
-        logoutTime: '6:15 PM',
-        sessionDuration: '9h 45m',
-        idleTime: '2h 18m',
-        apps: [
-            { name: 'Visual Studio Code', time: '2h 45m', category: 'productive' },
-            { name: 'Google Chrome', time: '1h 30m', category: 'neutral' },
-            { name: 'Slack', time: '45m', category: 'neutral' },
-            { name: 'YouTube', time: '38m', category: 'distracting' },
-            { name: 'Terminal', time: '35m', category: 'productive' }
-        ],
-        insights: 'Great focus today! You spent 63% of your time in productive applications. Your longest focus session was 1h 45m in VS Code. Consider taking more breaks to maintain peak performance.'
-    },
-    yesterday: {
-        productivityScore: 68,
-        totalTime: '7h 15m',
-        productiveTime: '4h 55m',
-        distractingTime: '1h 45m',
-        loginTime: '9:15 AM',
-        logoutTime: '7:30 PM',
-        sessionDuration: '10h 15m',
-        idleTime: '1h 35m',
-        apps: [
-            { name: 'IntelliJ IDEA', time: '3h 20m', category: 'productive' },
-            { name: 'Firefox', time: '1h 45m', category: 'neutral' },
-            { name: 'Discord', time: '1h 10m', category: 'distracting' },
-            { name: 'Notion', time: '55m', category: 'productive' },
-            { name: 'Spotify', time: '35m', category: 'neutral' }
-        ],
-        insights: 'Solid productivity yesterday. You maintained good focus with development tools. Discord usage was a bit high - consider muting notifications during deep work sessions.'
-    },
-    week: {
-        productivityScore: 71,
-        totalTime: '34h 20m',
-        productiveTime: '24h 25m',
-        distractingTime: '6h 15m',
-        loginTime: 'Avg 8:45 AM',
-        logoutTime: 'Avg 6:30 PM',
-        sessionDuration: 'Avg 9h 45m',
-        idleTime: 'Total 12h 30m',
-        apps: [
-            { name: 'Visual Studio Code', time: '12h 30m', category: 'productive' },
-            { name: 'Google Chrome', time: '8h 45m', category: 'neutral' },
-            { name: 'Slack', time: '4h 20m', category: 'neutral' },
-            { name: 'YouTube', time: '3h 15m', category: 'distracting' },
-            { name: 'Terminal', time: '2h 50m', category: 'productive' }
-        ],
-        insights: 'Excellent week! Your productivity has been consistently high. VS Code dominance shows strong development focus. Try to batch communication tasks to reduce Slack interruptions.'
-    }
-};
-
 document.getElementById('dateRange').addEventListener('change', function() {
     updateReport(this.value);
 });
 
-function updateReport(period) {
-    const data = mockData[period] || mockData.today;
-    
+function secondsToHuman(seconds) {
+    if (seconds === null || seconds === undefined) return 'Pending';
+    seconds = Math.round(seconds);
+    if (seconds < 60) return `${seconds}s`;
+    if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.round((seconds % 3600) / 60);
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+}
+
+async function fetchReport(period) {
+    try {
+        const resp = await ipcRenderer.invoke('generate-report', period);
+        if (!resp || !resp.success) return { error: resp ? resp.error : 'No response' };
+        return resp.report;
+    } catch (err) {
+        return { error: err.message };
+    }
+}
+
+async function updateReport(period) {
+    const report = await fetchReport(period);
+
+    if (!report || report.error) {
+        // show pending / error state
+        document.querySelector('.productive .stat-value').textContent = 'Pending';
+        document.querySelectorAll('.stat-value')[1].textContent = 'Pending';
+        document.querySelectorAll('.stat-value')[2].textContent = 'Pending';
+        document.querySelectorAll('.stat-value')[3].textContent = 'Pending';
+
+        document.getElementById('loginTime').textContent = 'Pending';
+        document.getElementById('logoutTime').textContent = 'Pending';
+        document.getElementById('sessionDuration').textContent = 'Pending';
+        document.getElementById('idleTime').textContent = 'Pending';
+
+        document.getElementById('appList').innerHTML = '<li class="app-item">No data available</li>';
+        document.querySelector('.insights').innerHTML = `<strong>AI Analysis:</strong> Pending`; 
+        return;
+    }
+
+    // Compute totals from rawData if available
+    let totalSeconds = null; 
+    let productiveSeconds = null;
+    let distractingSeconds = null;
+
+    if (report.rawData && report.rawData.productivityScore && report.rawData.productivityScore.total_time !== undefined) {
+        totalSeconds = report.rawData.productivityScore.total_time;
+        productiveSeconds = report.rawData.productivityScore.productive_time;
+        distractingSeconds = report.rawData.productivityScore.unproductive_time;
+    } else if (report.rawData && report.rawData.summary && report.rawData.summary.length > 0) {
+        totalSeconds = report.rawData.summary.reduce((s, item) => s + (item.total_duration || 0), 0);
+        productiveSeconds = report.rawData.summary.filter(i => i.category === 'productive').reduce((s, it) => s + (it.total_duration || 0), 0);
+        distractingSeconds = report.rawData.summary.filter(i => i.category === 'distracting').reduce((s, it) => s + (it.total_duration || 0), 0);
+    }
+
     // Update stats
-    document.querySelector('.productive .stat-value').textContent = data.productivityScore + '%';
-    document.querySelectorAll('.stat-value')[1].textContent = data.totalTime;
-    document.querySelectorAll('.stat-value')[2].textContent = data.productiveTime;
-    document.querySelectorAll('.stat-value')[3].textContent = data.distractingTime;
-    
-    // Update session times
-    document.getElementById('loginTime').textContent = data.loginTime;
-    document.getElementById('logoutTime').textContent = data.logoutTime;
-    document.getElementById('sessionDuration').textContent = data.sessionDuration;
-    document.getElementById('idleTime').textContent = data.idleTime;
-    
+    const score = typeof report.productivityScore === 'number' ? report.productivityScore : (report.productivityScore && report.productivityScore.score) || 'Pending';
+    document.querySelector('.productive .stat-value').textContent = (typeof score === 'number' ? `${score}%` : 'Pending');
+    document.querySelectorAll('.stat-value')[1].textContent = totalSeconds ? secondsToHuman(totalSeconds) : 'Pending';
+    document.querySelectorAll('.stat-value')[2].textContent = productiveSeconds ? secondsToHuman(productiveSeconds) : 'Pending';
+    document.querySelectorAll('.stat-value')[3].textContent = distractingSeconds ? secondsToHuman(distractingSeconds) : 'Pending';
+
+    // Session times (from DB session bounds when available)
+    document.getElementById('loginTime').textContent = report.loginTime || 'Pending';
+    document.getElementById('logoutTime').textContent = report.logoutTime || 'Pending';
+    document.getElementById('sessionDuration').textContent = (report.sessionDuration ? secondsToHuman(report.sessionDuration) : 'Pending');
+    document.getElementById('idleTime').textContent = 'Pending';
+
     // Update app list
     const appList = document.getElementById('appList');
     appList.innerHTML = '';
-    
-    data.apps.forEach(app => {
-        const li = document.createElement('li');
-        li.className = 'app-item';
-        li.innerHTML = `
-            <div>
-                <div class="app-name">${app.name}</div>
-                <span class="app-category ${app.category}">${app.category.charAt(0).toUpperCase() + app.category.slice(1)}</span>
-            </div>
-            <div class="app-time">${app.time}</div>
-        `;
-        appList.appendChild(li);
-    });
-    
+    const apps = report.topApps && report.topApps.length ? report.topApps : (report.rawData && report.rawData.activities ? report.rawData.activities : []);
+
+    if (!apps || apps.length === 0) {
+        appList.innerHTML = '<li class="app-item">No app activity recorded for this period.</li>';
+    } else {
+        apps.forEach(app => {
+            const li = document.createElement('li');
+            li.className = 'app-item';
+            const displayName = app.name || app.app_name || 'Unknown';
+            const duration = app.duration || app.total_duration || app.time || 'Pending';
+            const category = app.category || 'neutral';
+            li.innerHTML = `
+                <div>
+                    <div class="app-name">${displayName}</div>
+                    <span class="app-category ${category}">${(category.charAt(0) || '').toUpperCase() + (category.slice(1) || '')}</span>
+                </div>
+                <div class="app-time">${typeof duration === 'number' ? secondsToHuman(duration) : duration}</div>
+            `;
+            appList.appendChild(li);
+        });
+    }
+
     // Update insights
-    document.querySelector('.insights').innerHTML = `<strong>AI Analysis:</strong> ${data.insights}`;
+    document.querySelector('.insights').innerHTML = `<strong>AI Analysis:</strong> ${report.insights || 'Pending'}`;
 }
 
 // Initialize with today's data

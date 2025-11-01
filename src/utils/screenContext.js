@@ -21,14 +21,16 @@ if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
 /**
  * Get current screen context
  * @param {boolean} withOCR - whether to include OCR text from a screenshot
+ * @param {string} [saveDir] - optional directory to save the screenshot
  * @returns {Promise<object>}
  */
-async function getScreenContext(withOCR = false) {
+async function getScreenContext(withOCR = false, saveDir = TEMP_DIR) {
   const context = {
     timestamp: new Date().toISOString(),
     window: null,
     clipboardText: null,
     ocrText: null,
+    screenshotPath: null,
   };
 
   try {
@@ -50,13 +52,24 @@ async function getScreenContext(withOCR = false) {
 
     // 3️⃣ Optional screenshot + OCR
     if (withOCR) {
-      const imagePath = path.join(TEMP_DIR, 'screen.png');
+      // Ensure directory exists
+      if (!fs.existsSync(saveDir)) fs.mkdirSync(saveDir, { recursive: true });
+
+      // Use timestamp-based filename
+      const fileName = `screenshot_${Date.now()}.png`;
+      const imagePath = path.join(saveDir, fileName);
+
+      // Take screenshot
       const img = await screenshot({ format: 'png' });
       fs.writeFileSync(imagePath, img);
-      const { data: { text } } = await Tesseract.recognize(imagePath, 'eng');
+      context.screenshotPath = imagePath;
+
+      // Run OCR
+      const {
+        data: { text },
+      } = await Tesseract.recognize(imagePath, 'eng');
       context.ocrText = text.slice(0, 2000); // limit size
     }
-
   } catch (err) {
     console.error('⚠️ Screen context error:', err);
   }
@@ -79,6 +92,9 @@ function formatContextForLLM(context) {
 
   if (context.ocrText)
     prompt += `Visible screen text (OCR):\n${context.ocrText}\n\n`;
+
+  if (context.screenshotPath)
+    prompt += `Screenshot saved at: ${context.screenshotPath}\n`;
 
   return prompt.trim();
 }

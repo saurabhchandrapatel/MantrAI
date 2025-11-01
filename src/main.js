@@ -2,15 +2,15 @@ const { app, BrowserWindow, globalShortcut, ipcMain, Tray, Menu, nativeImage } =
 const path = require('path');
 const LLMService = require('./llm/LLMService');
 const { getScreenContext, formatContextForLLM } = require('./utils/screenContext');
+const ActivityTracker = require('./tracker/ActivityTracker');
+const ReportGenerator = require('./reports/ReportGenerator');
 
 require('dotenv').config();
 
-ipcMain.handle('get-screen-context', async (_, withOCR = false) => {
-  return await getScreenContext(withOCR);
-});
 
 
 const llmService = new LLMService();
+const activityTracker = new ActivityTracker();
 
 let mainWindow;
 let settingsWindow;
@@ -121,6 +121,7 @@ function createTray() {
 app.whenReady().then(() => {
   createWindow();
   createTray();
+  activityTracker.start();
   
   // Global shortcut
   globalShortcut.register('Alt+Space', () => {
@@ -194,6 +195,18 @@ app.whenReady().then(() => {
     }
   });
 
+  // Report generation handler - returns structured report data to renderer
+  ipcMain.handle('generate-report', async (_, period = 'today') => {
+    try {
+      const rg = new ReportGenerator();
+      const report = await rg.generateReport(period);
+      return { success: true, report };
+    } catch (error) {
+      console.error('Error generating report:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Context management handlers
   // ipcMain.handle('add-context', async (event, context) => {
   //   await llmService.addContext(context);
@@ -246,9 +259,24 @@ app.whenReady().then(() => {
     }
   });
   
+    
+  ipcMain.handle('get-screen-context', async (_, withOCR = false) => {
+    const saveDir = path.join(__dirname, 'screenshots'); // custom dir
+
+    const context = await getScreenContext(withOCR, saveDir);
+
+    console.log('✅ Saved screenshot:', context.screenshotPath);
+    
+    const llmPrompt = formatContextForLLM(context);
+    console.log('\n🧠 LLM Prompt:\n', llmPrompt);
+
+    return context;
+  });
+
   console.log('Floating AI Assistant started successfully!');
   console.log('Press Alt+Space to show/hide the assistant');
 });
+
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -256,6 +284,7 @@ app.on('window-all-closed', () => {
   }
 });
 
-app.on('will-quit', () => {
+app.on('will-quit', async () => {
+  await activityTracker.stop();
   globalShortcut.unregisterAll();
 });

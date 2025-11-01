@@ -27,6 +27,11 @@ class ReportGenerator {
         const summary = await this.db.getDailySummary(today);
         const topApps = await this.db.getTopApps(today, 5);
         const productivityScore = await this.db.getProductivityScore(today);
+        const sessionBounds = await this.db.getSessionBounds(today);
+
+        const loginTime = sessionBounds && sessionBounds.first_ts ? new Date(sessionBounds.first_ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
+        const logoutTime = sessionBounds && sessionBounds.last_ts ? new Date(sessionBounds.last_ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
+        const sessionDuration = (sessionBounds && sessionBounds.first_ts && sessionBounds.last_ts) ? Math.round((new Date(sessionBounds.last_ts) - new Date(sessionBounds.first_ts)) / 1000) : 0;
 
         return {
             type: 'productivity-report',
@@ -35,6 +40,9 @@ class ReportGenerator {
             summary: this.generateSummaryText(summary, productivityScore),
             topApps: this.formatTopApps(topApps),
             productivityScore: productivityScore.score,
+            loginTime,
+            logoutTime,
+            sessionDuration,
             insights: this.generateInsights(summary, productivityScore, topApps),
             rawData: {
                 activities,
@@ -53,6 +61,11 @@ class ReportGenerator {
         const summary = await this.db.getDailySummary(dateStr);
         const topApps = await this.db.getTopApps(dateStr, 5);
         const productivityScore = await this.db.getProductivityScore(dateStr);
+    const sessionBounds = await this.db.getSessionBounds(dateStr);
+
+    const loginTime = sessionBounds && sessionBounds.first_ts ? new Date(sessionBounds.first_ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
+    const logoutTime = sessionBounds && sessionBounds.last_ts ? new Date(sessionBounds.last_ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
+    const sessionDuration = (sessionBounds && sessionBounds.first_ts && sessionBounds.last_ts) ? Math.round((new Date(sessionBounds.last_ts) - new Date(sessionBounds.first_ts)) / 1000) : 0;
 
         return {
             type: 'productivity-report',
@@ -61,6 +74,9 @@ class ReportGenerator {
             summary: this.generateSummaryText(summary, productivityScore),
             topApps: this.formatTopApps(topApps),
             productivityScore: productivityScore.score,
+            loginTime,
+            logoutTime,
+            sessionDuration,
             insights: this.generateInsights(summary, productivityScore, topApps),
             rawData: {
                 activities,
@@ -135,7 +151,7 @@ class ReportGenerator {
         text += `Most productive day: ${weekSummary.mostProductiveDay}. `;
 
         return text;
-    }
+    } 
 
     formatTopApps(topApps) {
         return topApps.map(app => ({

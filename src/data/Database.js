@@ -1,78 +1,113 @@
+const path = require('path');
+const fs = require('fs');
+
 let Database;
 try {
   Database = require('better-sqlite3');
 } catch (error) {
-  console.log('better-sqlite3 not available, using mock database');
+  console.warn('⚠️ better-sqlite3 not available — using in-memory mock DB');
   Database = class MockDatabase {
-    constructor() {}
     exec() {}
     prepare() {
       return {
         run: () => {},
         get: () => null,
-        all: () => []
+        all: () => [],
       };
     }
     close() {}
   };
 }
-const path = require('path');
-const fs = require('fs');
 
 class ActivityDatabase {
-    constructor() {
-        this.dbPath = path.join(__dirname, 'activity.db');
-        this.db = null;
+  constructor(basePath = __dirname) {
+    try {
+      const { app } = require('electron');
+      this.dbPath = path.join(app.getPath('userData'), 'activity.db');
+    } catch {
+      this.dbPath = path.join(basePath, 'activity.db');
     }
 
-    async initialize() {
-        try {
-            // Ensure data directory exists
-            const dataDir = path.dirname(this.dbPath);
-            if (!fs.existsSync(dataDir)) {
-                fs.mkdirSync(dataDir, { recursive: true });
-            }
+    this.db = null;
+  }
 
-            this.db = new Database(this.dbPath);
-            this.createTables();
-            console.log('Database initialized successfully');
-        } catch (error) {
-            console.error('Failed to initialize database:', error);
-            throw error;
-        }
+  async initialize() {
+    try {
+      const dir = path.dirname(this.dbPath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+      this.db = new Database(this.dbPath);
+      this.createTables();
+
+      console.log(`✅ Database initialized at ${this.dbPath}`);
+    } catch (error) {
+      console.error('❌ Failed to initialize database:', error);
+      this.db = new Database(':memory:');
+      this.createTables();
     }
+  }
 
     createTables() {
-        // Activity tracking table
+        try {
         this.db.exec(`
             CREATE TABLE IF NOT EXISTS activities (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                date TEXT NOT NULL,
-                timestamp TEXT NOT NULL,
-                app_name TEXT NOT NULL,
-                duration INTEGER NOT NULL,
-                category TEXT NOT NULL,
-                productive BOOLEAN NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        `);
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            app_name TEXT NOT NULL,
+            duration INTEGER NOT NULL,
+            category TEXT NOT NULL,
+            productive INTEGER NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
 
-        // Create indexes for better performance
-        this.db.exec(`
             CREATE INDEX IF NOT EXISTS idx_activities_date ON activities(date);
             CREATE INDEX IF NOT EXISTS idx_activities_app ON activities(app_name);
             CREATE INDEX IF NOT EXISTS idx_activities_category ON activities(category);
-        `);
 
-        // Settings table for user preferences
-        this.db.exec(`
             CREATE TABLE IF NOT EXISTS settings (
-                key TEXT PRIMARY KEY,
-                value TEXT NOT NULL,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
         `);
+        } catch (error) {
+        console.error('Error creating tables:', error);
+        }
     }
+
+    
+    // createTables() {
+    //     // Activity tracking table
+    //     this.db.exec(`
+    //         CREATE TABLE IF NOT EXISTS activities (
+    //             id INTEGER PRIMARY KEY AUTOINCREMENT,
+    //             date TEXT NOT NULL,
+    //             timestamp TEXT NOT NULL,
+    //             app_name TEXT NOT NULL,
+    //             duration INTEGER NOT NULL,
+    //             category TEXT NOT NULL,
+    //             productive BOOLEAN NOT NULL,
+    //             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    //         )
+    //     `);
+
+    //     // Create indexes for better performance
+    //     this.db.exec(`
+    //         CREATE INDEX IF NOT EXISTS idx_activities_date ON activities(date);
+    //         CREATE INDEX IF NOT EXISTS idx_activities_app ON activities(app_name);
+    //         CREATE INDEX IF NOT EXISTS idx_activities_category ON activities(category);
+    //     `);
+
+    //     // Settings table for user preferences
+    //     this.db.exec(`
+    //         CREATE TABLE IF NOT EXISTS settings (
+    //             key TEXT PRIMARY KEY,
+    //             value TEXT NOT NULL,
+    //             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    //         )
+    //     `);
+    // }
 
     async saveActivity(activityData) {
         const stmt = this.db.prepare(`
@@ -143,6 +178,18 @@ class ActivityDatabase {
         `);
 
         return stmt.all(date);
+    }
+
+    async getSessionBounds(date) {
+        const stmt = this.db.prepare(`
+            SELECT 
+                MIN(timestamp) as first_ts,
+                MAX(timestamp) as last_ts
+            FROM activities
+            WHERE date = ?
+        `);
+
+        return stmt.get(date) || { first_ts: null, last_ts: null };
     }
 
     async getTopApps(date, limit = 10) {
