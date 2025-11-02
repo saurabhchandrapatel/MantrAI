@@ -181,24 +181,116 @@ app.whenReady().then(async () => {
   setupShortcuts();
   await activityTracker.start();
   let currentFileContext = null;
+  let currentExtraContext = null; // additional context added from renderer (e.g., screen capture)
 
   ipcMain.handle('set-file-context', async (event, { filename, content }) => {
-    currentFileContext = { filename, content };
-    return { success: true };
+    try {
+      // Accept either: { filename, content } OR { files: [ { name, content, isBinary } ] }
+      if (Array.isArray(arguments[1])) {
+        // unlikely path; but normalize
+        currentFileContext = { files: arguments[1] };
+      } else if (arguments[1] && arguments[1].files) {
+        currentFileContext = { files: arguments[1].files };
+      } else if (filename && content !== undefined) {
+        currentFileContext = { filename, content };
+      } else {
+        // fallback: store raw payload
+        currentFileContext = arguments[1] || null;
+      }
+      return { success: true };
+    } catch (err) {
+      console.error('set-file-context error', err);
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Provide screen/context capture to renderer via preload
+  ipcMain.handle('get-screen-context', async (event, useOCR = false) => {
+    try {
+      const ctx = await getScreenContext(!!useOCR);
+      return ctx;
+    } catch (err) {
+      console.error('get-screen-context error', err);
+      return null;
+    }
+  });
+
+  // Renderer requests to open the settings window
+  ipcMain.on('open-settings', (event) => {
+    try {
+      if (!settingsWindow) {
+        settingsWindow = new BrowserWindow({
+          width: 900,
+          height: 700,
+          webPreferences: {
+            nodeIntegration: true,
+            contextIsolation: false
+          }
+        });
+        settingsWindow.loadFile(path.join(__dirname, 'ui', 'settings.html'));
+        settingsWindow.on('closed', () => { settingsWindow = null; });
+      }
+      settingsWindow.show();
+      if (mainWindow) mainWindow.hide();
+    } catch (err) {
+      console.error('open-settings handler error', err);
+    }
   });
 
   ipcMain.handle('process-query', async (event, { query, context }) => {
     try {
+      // Priority: explicit context passed in > file-uploaded context > extra context (screen capture) > live screen capture
       if (!context) {
-        let screenContext = await getScreenContext(true);
-        context = formatContextForLLM(screenContext);
+        if (currentFileContext && currentFileContext.content) {
+          context = currentFileContext.content;
+        } else if (currentExtraContext) {
+          context = formatContextForLLM(currentExtraContext);
+        } else {
+          const screenContext = await getScreenContext(true);
+          context = formatContextForLLM(screenContext);
+        }
       }
+
       let response = await llmService.processQuery(query, context);
       console.log('ChatGPT response:', response);
       return response;
     } catch (error) {
       console.error('Error processing query:', error);
       return `Error: ${error.message}. Please check your OpenAI API key.`;
+    }
+  });
+
+  // Allow renderer to add captured context (e.g., OCR/window) that will be used by subsequent queries
+  ipcMain.handle('add-context', async (event, context) => {
+    try {
+      currentExtraContext = context || null;
+      return { success: true };
+    } catch (err) {
+      console.error('add-context error', err);
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('clear-context', async () => {
+    try {
+      currentExtraContext = null;
+      return { success: true };
+    } catch (err) {
+      console.error('clear-context error', err);
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('get-conversation-history', async () => {
+    try {
+      if (llmService && llmService.memory && typeof llmService.memory.loadMemoryVariables === 'function') {
+        const vars = await llmService.memory.loadMemoryVariables({});
+        return vars.history || [];
+      }
+      return [];
+    } catch (err) {
+      console.error('get-conversation-history error', err);
+      return [];
     }
   });
 

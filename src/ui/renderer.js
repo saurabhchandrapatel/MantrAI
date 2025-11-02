@@ -32,6 +32,7 @@ class FloatingAssistantUI {
         
         this.searchInput = document.getElementById('search-input');
         this.suggestionsContainer = document.getElementById('suggestions');
+    this.contextIndicator = document.getElementById('context-indicator');
  
         this.agentBtn = document.getElementById('agent-btn');
         this.appsBtn = document.getElementById('apps-btn');
@@ -74,6 +75,9 @@ class FloatingAssistantUI {
         }
 
         this.focusInput();
+
+    // Reflect current context/file state in the indicator
+    this.updateContextIndicator();
 
     }
 
@@ -230,15 +234,8 @@ class FloatingAssistantUI {
         });
 
         this.fileUploadBtn.addEventListener('click', () => this.fileInput.click());
-        this.fileInput.addEventListener('change', async (e) => {
-            const f = e.target.files[0];
-            if (!f) return;
-            const text = await f.text();
-            // send file context to main
-            await window.system?.setFileContext?.({ filename: f.name, content: text });
-            this.setMode('agent'); // switch to agent so user can ask about file
-            this.searchInput.focus();
-        });
+        // Use a single handler for file/folder uploads (supports multiple files via webkitdirectory)
+        this.fileInput.addEventListener('change', this.handleFileUpload.bind(this));
 
         // this.searchBtn.addEventListener('click', () => this.handleSearch());
         this.settingsBtn.addEventListener('click', () => {
@@ -350,14 +347,13 @@ class FloatingAssistantUI {
     }
 
     async handleSettingsPage() {
-        
-        // todo open settings page
-
-        // if (window.electronAPI) {
-        //     window.electronAPI.openSettings();
-        // } else {
-        //     this.displayError('Settings page not available in demo mode.');
-        // }
+        if (window.electronAPI && typeof window.electronAPI.openSettings === 'function') {
+            // ask main process to open the settings window and hide the assistant
+            window.electronAPI.openSettings();
+            this.hideWindow();
+        } else {
+            this.displayError('Settings page not available in this environment.');
+        }
     }
 
     async captureContext() {
@@ -365,9 +361,22 @@ class FloatingAssistantUI {
         try {
             if (window.screenContext) {
                 const context = await window.screenContext.get(true); // true for OCR
+                if (!context) {
+                    this.displayError('No screen content found. Try capturing again or ensure the screen is visible.');
+                    return;
+                }
                 this.currentContext = context;
                 this.displayContext(context);
-                await window.electronAPI.addContext(context); // Send to main process
+                // Send to main process and check response
+                if (window.electronAPI && typeof window.electronAPI.addContext === 'function') {
+                    const res = await window.electronAPI.addContext(context);
+                    if (!res || !res.success) {
+                        this.displayError('Failed to attach context to assistant. See console for details.');
+                        console.warn('addContext response:', res);
+                    } else {
+                        this.updateContextIndicator();
+                    }
+                }
             } else {
                 this.displayError('Context capture not available.');
             }
@@ -401,7 +410,7 @@ class FloatingAssistantUI {
         this.currentContext = null;
         this.contextContainer.classList.add('hidden');
         if (window.electronAPI) {
-            window.electronAPI.clearContext();
+            window.electronAPI.clearContext().then(() => this.updateContextIndicator()).catch(() => this.updateContextIndicator());
         }
         this.updateWindowSize();
     }
@@ -585,50 +594,90 @@ class FloatingAssistantUI {
     }
 
     async handleFileUpload(event) {
-        const file = event.target.files[0];
-        if (!file) return;
+        const files = Array.from(event.target.files || []);
+        if (!files.length) return;
 
         try {
-            // Update button to show selected file
-            this.fileUploadBtn.innerHTML = `
-                <svg class="option-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-                    <polyline points="13 2 13 9 20 9"></polyline>
-                </svg>
-                <span class="file-name">${file.name}</span>
-            `;
-            
-            this.currentFile = file;
-            this.searchInput.placeholder = `Ask a question about ${file.name}...`;
-            
-            // Store file content in memory
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const content = e.target.result;
-                if (window.electronAPI) {
-                    await window.electronAPI.setFileContext(file.name, content);
+            // If multiple files (folder), prepare a bulk payload
+            const readFile = (file) => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                // decide text vs binary
+                const isText = file.type.startsWith('text') || /\.(txt|md|json|js|py|csv|log)$/i.test(file.name);
+                reader.onload = (e) => {
+                    let content = e.target.result;
+                    if (!isText && content instanceof ArrayBuffer) {
+                        // convert to base64
+                        const bytes = new Uint8Array(content);
+                        let binary = '';
+                        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+                        content = btoa(binary);
+                    }
+                    resolve({ name: file.name, content, isBinary: !isText, size: file.size });
+                };
+                reader.onerror = reject;
+                if (isText) reader.readAsText(file);
+                else reader.readAsArrayBuffer(file);
+            });
+
+            const filesPayload = await Promise.all(files.map(f => readFile(f)));
+
+            // Update UI showing folder / multiple files
+            const summaryName = files.length > 1 ? `Folder: ${files.length} files` : files[0].name;
+            this.fileUploadBtn.innerHTML = `<span class="file-name">${summaryName}</span>`;
+            this.currentFile = { name: summaryName, filesCount: files.length };
+            this.searchInput.placeholder = `Ask a question about ${summaryName}...`;
+
+            // Send structured payload to main process (bulk)
+            if (window.electronAPI && typeof window.electronAPI.setFileContextBulk === 'function') {
+                const res = await window.electronAPI.setFileContextBulk({ files: filesPayload });
+                if (!res || !res.success) {
+                    console.warn('setFileContextBulk failed', res);
+                    this.displayError('Failed to attach uploaded files as context. See console for details.');
+                } else {
+                    this.updateContextIndicator();
                 }
-            };
-            reader.readAsText(file);
-            
+            } else if (window.electronAPI && typeof window.electronAPI.setFileContext === 'function') {
+                // fallback: set first file only
+                await window.electronAPI.setFileContext(filesPayload[0].name, filesPayload[0].content);
+                this.updateContextIndicator();
+            }
+
+            // Switch to agent mode so user can ask about uploaded files
+            this.setMode('agent');
+            this.searchInput.focus();
+
         } catch (error) {
-            console.error('Error handling file:', error);
-            this.displayError('Failed to process file. Please try again.');
+            console.error('Error handling files:', error);
+            this.displayError('Failed to process uploaded files. Please try again.');
         }
     }
 
-    handleSettingsPage() {
-        if (window.electronAPI) {
-            window.electronAPI.openSettings();
-            this.hideWindow(); // Hide the main window when opening settings
-        }
-    }
 
     updateWindowSize() {
         const height = document.body.scrollHeight + 40; // Add padding
         if (window.electronAPI) {
             // allow up to 800px or adjust as needed
             window.electronAPI.resizeWindow(Math.max(250, Math.min(800, height)));
+        }
+    }
+
+    updateContextIndicator() {
+        try {
+            if (!this.contextIndicator) return;
+            if (this.currentFile || this.currentContext) {
+                // show brief label
+                let text = 'Context attached';
+                if (this.currentFile) {
+                    if (this.currentFile.filesCount) text = `${this.currentFile.filesCount} files attached`;
+                    else if (this.currentFile.name) text = this.currentFile.name;
+                }
+                this.contextIndicator.textContent = text;
+                this.contextIndicator.classList.remove('hidden');
+            } else {
+                this.contextIndicator.classList.add('hidden');
+            }
+        } catch (e) {
+            console.warn('updateContextIndicator error', e);
         }
     }
 

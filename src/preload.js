@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resizeWindow: (height) => ipcRenderer.send('resize-window', height),
   openSettings: () => ipcRenderer.send('open-settings'),
   setFileContext: (filename, content) => ipcRenderer.invoke('set-file-context', { filename, content }),
+  // Accept structured payloads for bulk folder uploads: { files: [ { name, content, isBinary } ] }
+  setFileContextBulk: (payload) => ipcRenderer.invoke('set-file-context', payload),
   
   // Context management
   addContext: (context) => ipcRenderer.invoke('add-context', context),
