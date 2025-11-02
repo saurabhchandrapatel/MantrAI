@@ -4,12 +4,12 @@ const LLMService = require('./llm/LLMService');
 const { getScreenContext, formatContextForLLM } = require('./utils/screenContext');
 const ActivityTracker = require('./tracker/ActivityTracker');
 const ReportGenerator = require('./reports/ReportGenerator');
-
+const { getInstalledApps } = require('get-installed-apps');
+ 
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const execAsync = promisify(exec);
-const fs = require('fs').promises;
-const os = require('os');
+const fsSync = require('fs'); // added to use existsSync
 
 
 require('dotenv').config();
@@ -49,6 +49,7 @@ function createWindow() {
   // Open DevTools for debugging
   mainWindow.webContents.openDevTools();
   
+
   // Center window
   const { screen } = require('electron');
   const display = screen.getPrimaryDisplay();
@@ -59,22 +60,14 @@ function createWindow() {
     Math.round((height - bounds.height) / 2)
   );
 
-  // Disable auto-hide for debugging
-  // mainWindow.on('blur', () => {
-  //   if (isVisible) {
-  //     mainWindow.hide();
-  //     isVisible = false;
-  //   }
-  // });
-
-  // mainWindow.on('blur', () => {
-  //   setTimeout(() => {
-  //     if (!mainWindow.isFocused() && isVisible) {
-  //       mainWindow.hide();
-  //       isVisible = false;
-  //     }
-  //   }, 200);
-  // });
+  mainWindow.on('blur', () => {
+    setTimeout(() => {
+      if (!mainWindow.isFocused() && isVisible) {
+        mainWindow.hide();
+        isVisible = false;
+      }
+    }, 200);
+  });
 
 }
 
@@ -159,93 +152,27 @@ function setupShortcuts() {
     }
   });
 }
+ 
+ 
+function validateIconPath(iconPath) {
+  if (!iconPath) return null;
 
+  // Clean ",0" suffix if present (e.g. "C:\\App\\icon.ico,0")
+  const cleanPath = iconPath.split(',')[0].trim();
 
-async function findShortcutPathForName(appName) {
-    // Search common Start Menu folders for a .lnk whose filename matches appName (case-insensitive)
-    const startMenuFolders = [
-        path.join(process.env.ProgramData || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
-        path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs')
-    ].filter(Boolean);
+  // Decode URL-style encoding (e.g. "%20" → space)
+  const decodedPath = decodeURIComponent(cleanPath);
 
-    const nameEsc = appName.replace("'", "''");
-    const psPaths = startMenuFolders.map(p => `'${p.replace("'", "''")}'`).join(',');
-    const psCmd = `
-      $folders = @(${psPaths});
-      $folders | ForEach-Object {
-        Get-ChildItem -Path $_ -Filter '*.lnk' -Recurse -ErrorAction SilentlyContinue
-      } | Where-Object { $_.BaseName -like '*${nameEsc}*' } | Select-Object -First 1 -ExpandProperty FullName | ConvertTo-Json -Compress
-    `;
-    try {
-        const { stdout } = await execAsync(`powershell -NoProfile -Command "${psCmd.replace(/\n/g, ' ')}"`);
-        const result = stdout.trim();
-        if (!result) return null;
-        // PowerShell returns a JSON string path or nothing
-        return JSON.parse(result);
-    } catch (err) {
-        console.warn('findShortcutPathForName error', err);
-        return null;
-    }
+  // Check if the file actually exists
+  if (fsSync.existsSync(decodedPath)) {
+    return decodedPath;
+  } else {
+    console.warn('Icon not found:', decodedPath);
+    return null;
+  }
 }
 
-async function resolveShortcutTarget(lnkPath) {
-    // Use WScript.Shell COM to resolve .lnk target
-    const safePath = lnkPath.replace("'", "''");
-    const psCmd = `$s=(New-Object -ComObject WScript.Shell).CreateShortcut('${safePath}'); Write-Output $s.TargetPath`;
-    try {
-        const { stdout } = await execAsync(`powershell -NoProfile -Command "${psCmd.replace(/\n/g,' ')}"`);
-        return stdout.trim() || null;
-    } catch (err) {
-        console.warn('resolveShortcutTarget error', err);
-        return null;
-    }
-}
 
-async function iconDataUrlFromPath(filePath) {
-    try {
-        // nativeImage can read icons from exe, dll, ico files
-        if (!filePath) return null;
-        const exists = await fs.access(filePath).then(() => true).catch(() => false);
-        if (!exists) return null;
-        const img = nativeImage.createFromPath(filePath);
-        if (img.isEmpty()) return null;
-        return img.toDataURL(); // returns data:image/png;base64,...
-    } catch (err) {
-        console.warn('iconDataUrlFromPath error', err);
-        return null;
-    }
-}
-
-// helper: ensure cache dir and return cached dataURL or create & cache resized PNG
-async function getCachedIconDataUrl(sourcePath, cacheKey, size = 32) {
-    try {
-        if (!sourcePath) return null;
-        const cacheDir = path.join(app.getPath('userData'), 'icon-cache');
-        await fs.mkdir(cacheDir, { recursive: true });
-        const safeKey = cacheKey.replace(/[^a-z0-9-_]/gi, '_').toLowerCase();
-        const cacheFile = path.join(cacheDir, `${safeKey}_${size}x${size}.png`);
-
-        // return cached if exists
-        try {
-            await fs.access(cacheFile);
-            const img = nativeImage.createFromPath(cacheFile);
-            if (!img.isEmpty()) return img.toDataURL();
-        } catch (__) { /* cache miss -> continue */ }
-
-        // create from source path
-        const srcImg = nativeImage.createFromPath(sourcePath);
-        if (srcImg.isEmpty()) return null;
-
-        const resized = srcImg.resize({ width: size, height: size, quality: 'best' });
-        const pngBuffer = resized.toPNG();
-
-        await fs.writeFile(cacheFile, pngBuffer);
-        return resized.toDataURL();
-    } catch (err) {
-        console.warn('getCachedIconDataUrl error', err);
-        return null;
-    }
-}
 
 // Create window and start app
 app.whenReady().then(async () => {
@@ -253,9 +180,6 @@ app.whenReady().then(async () => {
   createTray();
   setupShortcuts();
   await activityTracker.start();
-  // Register the shortcuts  
-  // IPC handlers
-  // File context storage
   let currentFileContext = null;
 
   ipcMain.handle('set-file-context', async (event, { filename, content }) => {
@@ -278,7 +202,6 @@ app.whenReady().then(async () => {
     }
   });
 
-
   ipcMain.on('resize-window', (event, newHeight) => {
     if (mainWindow) {
       const width = mainWindow.getSize()[0];
@@ -287,171 +210,56 @@ app.whenReady().then(async () => {
     }
   });
 
+   // Replace the get-installed-apps handler
   ipcMain.handle('get-installed-apps', async () => {
     try {
-      // 1) Get basic app list quickly and return it to the renderer immediately
-      const { stdout } = await execAsync('powershell -NoProfile -Command "Get-StartApps | ConvertTo-Json -Depth 2"');
-      const appsRaw = JSON.parse(stdout || '[]');
-      const appsArr = Array.isArray(appsRaw) ? appsRaw : [appsRaw];
-      const normalized = appsArr.map(a => ({
-        Name: a.Name || a.AppName || '',
-        AppID: a.AppID || a.AppUserModelID || '',
-        Icon: null
-      }));
+        const apps = await getInstalledApps();
+        console.log(apps)
+        const normalized = apps
+        .map(app => {
 
-      // Kick off background enrichment (icons) without blocking the renderer
-      (async () => {
-        try {
-          // 2) Scan Start Menu shortcuts once
-          const startMenuFolders = [
-            path.join(process.env.ProgramData || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
-            path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs')
-          ].filter(Boolean);
-          const psPaths = startMenuFolders.map(p => `'${p.replace("'", "''")}'`).join(',');
-          const psCmd = `$folders = @(${psPaths}); $folders | ForEach-Object { Get-ChildItem -Path $_ -Filter '*.lnk' -Recurse -ErrorAction SilentlyContinue } | Select-Object -ExpandProperty FullName | ConvertTo-Json -Depth 1`;
-          const { stdout: lnkOut } = await execAsync(`powershell -NoProfile -Command "${psCmd.replace(/\n/g, ' ')}"`);
-          let lnkList = [];
-          if (lnkOut && lnkOut.trim()) {
-            const parsed = JSON.parse(lnkOut);
-            lnkList = Array.isArray(parsed) ? parsed : [parsed];
-          }
+          const validIcon = validateIconPath(app.DisplayIcon);
+          return {
+            Name: app.appName || app.DisplayName || app.kMDItemDisplayName || '',
+            AppID: app.DisplayIcon || app.kMDItemFSName || app.appIdentifier || '',
+            DisplayIcon: validIcon,
+            Icon: null // We'll handle icons separately if needed
+          };
+        })
+        .filter(app => app.Name && app.AppID);
 
-          // 3) Prepare basename index
-          const lnkBasenames = lnkList.map(p => ({ path: p, base: path.basename(p, '.lnk').toLowerCase() }));
-
-          // 4) Enrich apps with icons in batches
-          const BATCH_SIZE = 6;
-          for (let i = 0; i < normalized.length; i += BATCH_SIZE) {
-            const batch = normalized.slice(i, i + BATCH_SIZE);
-            await Promise.all(batch.map(async appItem => {
-              try {
-                const name = (appItem.Name || '').toLowerCase().trim();
-                if (!name) return;
-                // find best matching shortcut by basename
-                const candidate = lnkBasenames.find(l => l.base.includes(name) || name.includes(l.base));
-                if (!candidate) return;
-                const target = await resolveShortcutTarget(candidate.path);
-                if (target) {
-                  const iconUrl = await getCachedIconDataUrl(target, appItem.Name || appItem.AppID || path.basename(target));
-                  if (iconUrl) { appItem.Icon = iconUrl; }
-                }
-                // fallback: check .ico sibling
-                if (!appItem.Icon) {
-                  const icoCandidate = candidate.path.replace(/\.lnk$/i, '.ico');
-                  const icoIcon = await iconDataUrlFromPath(icoCandidate);
-                  if (icoIcon) { appItem.Icon = icoIcon; }
-                }
-              } catch (e) {
-                console.warn('icon enrich error for', appItem.Name, e);
-              }
-            }));
-            // send progressive update to renderer after each batch
-            try {
-              if (mainWindow && mainWindow.webContents) {
-                mainWindow.webContents.send('installed-apps-updated', normalized);
-              }
-            } catch (e) {
-              console.warn('failed to send installed-apps-updated', e);
-            }
-          }
-        } catch (bgErr) {
-          console.warn('background icon enrichment error', bgErr);
-        }
-      })();
-
-      return normalized;
+        console.log('Found apps:', normalized.length);
+        return normalized;
     } catch (err) {
-      console.error('get-installed-apps error', err);
-      return [];
+        console.error('Error getting installed apps:', err);
+        return [];
     }
-  });
+}); 
 
-  // ipcMain.handle('launch-app', async (_, appId) => {
-  //     try {
-  //         // Use explorer to open the app via AppsFolder
-  //         await execAsync(`explorer shell:AppsFolder\\${appId}`);
-  //         return true;
-  //     } catch (err) {
-  //         console.error('launch-app error', err);
-  //         return false;
-  //     }
-  // });
-
-  ipcMain.handle('launch-app', async (_, appId) => {
+  // Replace the existing launch-app handler with this improved version:
+   // Update the launch-app handler to work with the new format
+  ipcMain.handle('launch-app', async (_, app) => {
       try {
-          // Try different launch methods
-          const methods = [
-              // Method 1: Direct shell:AppsFolder (UWP apps)
-              async () => {
-                  await execAsync(`explorer shell:AppsFolder\\${appId}`);
-                  return true;
-              },
-              // Method 2: Start Menu shortcut
-              async () => {
-                  const startMenuFolders = [
-                      path.join(process.env.ProgramData || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
-                      path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'Start Menu', 'Programs')
-                  ].filter(Boolean);
-                  
-                  // Find .lnk file matching app name
-                  const psPath = startMenuFolders.map(p => `'${p.replace("'", "''")}'`).join(',');
-                  const findCmd = `
-                      $folders = @(${psPath});
-                      foreach ($folder in $folders) {
-                          Get-ChildItem -Path $folder -Filter '*.lnk' -Recurse -ErrorAction SilentlyContinue |
-                          Where-Object { $_.BaseName -like '*${appId.replace("'", "''")}*' } |
-                          Select-Object -First 1 -ExpandProperty FullName
-                      }
-                  `;
-                  const { stdout } = await execAsync(`powershell -NoProfile -Command "${findCmd.replace(/\n/g, ' ')}"`);
-                  if (stdout.trim()) {
-                      await execAsync(`start "" "${stdout.trim()}"`);
-                      return true;
-                  }
-                  throw new Error('Shortcut not found');
-              },
-              // Method 3: Direct executable path if known
-              async () => {
-                  const commonPaths = {
-                      'Microsoft.VisualStudioCode': [
-                          path.join(os.homedir(), 'AppData', 'Local', 'Programs', 'Microsoft VS Code', 'Code.exe'),
-                          'C:\\Program Files\\Microsoft VS Code\\Code.exe',
-                          'C:\\Program Files (x86)\\Microsoft VS Code\\Code.exe'
-                      ]
-                  };
-                  
-                  const paths = commonPaths[appId] || [];
-                  for (const exePath of paths) {
-                      try {
-                          await fs.access(exePath);
-                          await execAsync(`start "" "${exePath}"`);
-                          return true;
-                      } catch (e) {
-                          continue;
-                      }
-                  }
-                  throw new Error('Executable not found');
-              }
-          ];
-
-          // Try each launch method
-          for (const method of methods) {
-              try {
-                  const success = await method();
-                  if (success) return true;
-              } catch (e) {
-                  console.log('Launch method failed:', e.message);
-                  continue;
-              }
+          if (!app.AppID) {
+              throw new Error('No app path provided');
           }
 
-          throw new Error('All launch methods failed');
+          // Handle different path formats
+          if (app.AppID.endsWith('.exe') || app.AppID.endsWith('.app')) {
+              await execAsync(`start "" "${app.AppID}"`);
+              console.log(`Launched via direct path: ${app.AppID}`);
+              return true;
+          }
+
+          // Try launching via Start-Process as fallback
+          await execAsync(`powershell -NoProfile -Command "Start-Process '${app.Name.replace("'", "''")}'"`);
+          console.log(`Launched via Start-Process: ${app.Name}`);
+          return true;
       } catch (err) {
-          console.error('launch-app error', err);
+          console.error('launch-app error:', err);
           return false;
       }
   });
-
 
 });
 

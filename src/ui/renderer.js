@@ -29,18 +29,26 @@ class FloatingAssistantUI {
         
         this.currentResponse = '';
         this.currentContext = null;
-
+        
         this.searchInput = document.getElementById('search-input');
         this.suggestionsContainer = document.getElementById('suggestions');
+ 
+        this.agentBtn = document.getElementById('agent-btn');
+        this.appsBtn = document.getElementById('apps-btn');
+        this.fileUploadBtn = document.getElementById('file-upload-btn');
+        this.fileInput = document.getElementById('file-input');
+
+        this.mode = 'agent'; // 'agent' | 'apps' | 'file'
         this.installedApps = [];
         this.filteredApps = [];
+        this.isLaunching = false;
         this.init();
     }
 
     async init() {
         this.setupEventListeners();
         this.setupIPCListeners();
-        
+
         await this.loadInstalledApps();
         console.log('installedApps count:', this.installedApps.length);
 
@@ -52,7 +60,7 @@ class FloatingAssistantUI {
                         this.installedApps = Array.isArray(updated) ? updated : this.installedApps;
                         console.log('installedApps updated (bg):', this.installedApps.length);
                         const q = this.searchInput.value || '';
-                        if (q) {
+                        if (q && this.mode === 'apps') {
                             const matches = this.filterApps(q);
                             this.showSuggestions(matches);
                         }
@@ -73,9 +81,7 @@ class FloatingAssistantUI {
         try {
             if (window.system && window.system.getInstalledApps) {
                 this.installedApps = await window.system.getInstalledApps();
-            } else {
-                console.warn('window.system.getInstalledApps not available');
-                this.installedApps = [];
+                console.log('installedApps count:', this.installedApps.length);
             }
         } catch (err) {
             console.error('loadInstalledApps error', err);
@@ -83,10 +89,26 @@ class FloatingAssistantUI {
         }
     }
 
+    setMode(newMode) {
+        this.mode = newMode;
+        // UI active state
+        this.agentBtn.classList.toggle('active', newMode === 'agent');
+        this.appsBtn.classList.toggle('active', newMode === 'apps');
+        // adjust placeholder
+        if (newMode === 'agent') this.searchInput.placeholder = "Ask the assistant...";
+        else if (newMode === 'apps') this.searchInput.placeholder = "Search installed apps...";
+        else if (newMode === 'file') this.searchInput.placeholder = "Upload a file to ask questions about it...";
+        this.showSuggestions([]); // clear
+    }
+
     filterApps(query) {
         if (!query) return [];
         const q = query.toLowerCase();
-        return this.installedApps.filter(a => (a.Name || '').toLowerCase().includes(q) || (a.AppID || '').toLowerCase().includes(q)).slice(0, 6);
+        return this.installedApps.filter(a => {
+            const name = (a.Name || a.appName || '').toLowerCase();
+            const pid = (a.AppID || a.DisplayIcon || '').toLowerCase();
+            return name.includes(q) || pid.includes(q);
+        }).slice(0, 8);
     }
 
     pickColor(name) {
@@ -124,50 +146,128 @@ class FloatingAssistantUI {
             this.suggestionsContainer.innerHTML = '';
             return;
         }
-
         this.suggestionsContainer.innerHTML = list.map(a => {
-            // if main process can provide icon path or data URL in a.Icon, use it; otherwise generate avatar
-            const iconSrc = a.Icon || this.generateAvatarDataUrl(a.Name || a.AppID || 'A', 40);
+            const name = a.Name || a.appName || a.DisplayName || '';
+            const appId = a.AppID || a.DisplayIcon || a.appIdentifier || '';
+            const icon = a.Icon || a.DisplayIcon || ''; // may be path or dataURL; renderer expects dataURL or fallback
+            const iconHtml = icon ? `<img class="suggestion-icon" src="${icon}" />` : `<div class="suggestion-icon">${(name||'?').charAt(0)}</div>`;
             return `
-            <div class="suggestion-item" data-appid="${a.AppID}">
-                <img class="suggestion-icon" src="${iconSrc}" alt="${(a.Name||'')}" />
-                <span class="suggestion-name">${a.Name}</span>
-            </div>
+                <div class="suggestion-item" data-appid="${appId}" data-name="${name}">
+                    ${iconHtml}
+                    <span class="suggestion-name">${name}</span>
+                </div>
             `;
         }).join('');
         this.suggestionsContainer.style.display = 'block';
     }
 
     setupEventListeners() {
+        // Enter key or click
+        const submit = async () => {
+            const query = this.searchInput.value.trim();
+            if (!query) return;
+            if (this.mode === 'agent') {
+                // send to LLM
+                try {
+                    if (this.showLoading) this.showLoading();
+
+                    let response = null;
+
+                    // Preferred: system API exposed by preload
+                    if (window.system && typeof window.system.processQuery === 'function') {
+                        response = await window.system.processQuery(query);
+                    }
+                    // Next: electronAPI bridge
+                    else if (window.electronAPI && typeof window.electronAPI.processQuery === 'function') {
+                        response = await window.electronAPI.processQuery(query);
+                    }
+                    // Older fallback: ipc invoke wrapper if present
+                    else if (window.api && typeof window.api.invoke === 'function') {
+                        response = await window.api.invoke('process-query', { query, context: null });
+                    }
+                    // Final fallback: demo responder
+                    else {
+                        response = this.getDemoResponse(query);
+                    }
+
+                    this.displayResults(response);
+                } catch (err) {
+                    console.error('process-query error', err);
+                    this.displayError('Failed to contact assistant. See console for details.');
+                } finally {
+                    if (this.hideLoading) this.hideLoading();
+                }
+            } else if (this.mode === 'apps') {
+                // if exact match, launch first result
+                const matches = this.filterApps(query);
+                if (matches.length > 0) {
+                    await this.launchApp(matches[0]);
+                }
+            }
+        };
+
         this.searchInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
+                submit();
                 e.preventDefault();
-                this.handleSearch();
             } else if (e.key === 'Escape') {
-                this.hideWindow();
+                this.searchInput.value = '';
+                this.showSuggestions([]);
             }
         });
+       
 
-        this.searchBtn.addEventListener('click', () => this.handleSearch());
-        this.settingsBtn.addEventListener('click', () => this.handleSettingsPage());
+
+        this.agentBtn.addEventListener('click', () => {
+            this.setMode('agent');
+            this.hideResults();
+            this.searchInput.focus();
+        });
+        this.appsBtn.addEventListener('click', () => {
+            this.setMode('apps');
+            this.hideResults();
+            this.searchInput.focus();
+        });
+
         this.fileUploadBtn.addEventListener('click', () => this.fileInput.click());
-        this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+        this.fileInput.addEventListener('change', async (e) => {
+            const f = e.target.files[0];
+            if (!f) return;
+            const text = await f.text();
+            // send file context to main
+            await window.system?.setFileContext?.({ filename: f.name, content: text });
+            this.setMode('agent'); // switch to agent so user can ask about file
+            this.searchInput.focus();
+        });
+
+        // this.searchBtn.addEventListener('click', () => this.handleSearch());
+        this.settingsBtn.addEventListener('click', () => {
+            this.hideResults();
+            this.searchInput.focus();
+        });
+
         this.captureContextBtn.addEventListener('click', () => this.captureContext());
         this.clearContextBtn.addEventListener('click', () => this.clearContext());
         this.closeBtn.addEventListener('click', () => this.hideResults());
         this.copyBtn.addEventListener('click', () => this.copyToClipboard());
         const resizeObserver = new ResizeObserver(() => this.updateWindowSize());
         resizeObserver.observe(document.body);
-
-
-        // Add input event listener for suggestions
+        // input handling
         this.searchInput.addEventListener('input', (e) => {
-            const value = e.target.value;
-            console.log('search input:', value);
-            const matches = this.filterApps(value);
-            this.showSuggestions(matches);
+            const v = e.target.value;
+            if (this.mode === 'apps') {
+                const matches = this.filterApps(v);
+                this.showSuggestions(matches);
+            } else {
+                // hide suggestions in agent mode (or implement LLM prompt suggestions)
+                this.showSuggestions([]);
+            }
         });
 
+
+        
+
+        this.searchBtn.addEventListener('click', submit);
         // Handle clicking outside suggestions
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.suggestions-container') && !e.target.closest('#search-input')) {
@@ -176,26 +276,24 @@ class FloatingAssistantUI {
         });
 
         // Handle clicking on a suggestion
-
-        // Handle suggestion clicks
         if (this.suggestionsContainer) {
+           
             this.suggestionsContainer.addEventListener('click', async (e) => {
-                const item = e.target.closest('.suggestion-item');
-                if (!item) return;
+            const item = e.target.closest('.suggestion-item');
+            if (!item || this.isLaunching) return;
+            try {
+                this.isLaunching = true;
                 const appId = item.dataset.appid;
-                console.log('launching', appId);
-                if (window.system && window.system.launchApp) {
-                    const ok = await window.system.launchApp(appId);
-                    console.log('launch result', ok);
-                    if (ok) {
-                        this.searchInput.value = '';
-                        this.showSuggestions([]);
-                    } else {
-                        this.displayError('Failed to launch app');
-                    }
-                }
-            });
-        }
+                const name = item.dataset.name || '';
+                await this.launchApp({ AppID: appId, Name: name });
+                this.searchInput.value = '';
+                this.showSuggestions([]);
+            } finally {
+                setTimeout(() => { this.isLaunching = false; }, 800);
+            }
+        });
+
+    }
 
     }
 
@@ -416,23 +514,46 @@ class FloatingAssistantUI {
     }
 
     showResults() {
-        this.resultsContainer.classList.remove('hidden');
+        if (this.resultsContainer && this.resultsContainer.classList) {
+            this.resultsContainer.classList.remove('hidden');
+        }
     }
 
     hideResults() {
-        this.resultsContainer.classList.add('hidden');
-        this.updateWindowSize();
+        if (this.resultsContainer && this.resultsContainer.classList) {
+            this.resultsContainer.classList.add('hidden');
+        }
+        if (this.updateWindowSize) this.updateWindowSize();
     }
 
     showLoading() {
-        this.loading.classList.remove('hidden');
-        this.hideResults();
-        this.contextContainer.classList.add('hidden');
-        this.updateWindowSize();
+        try {
+            if (this.loading && this.loading.classList) this.loading.classList.remove('hidden');
+        } catch (e) {
+            console.warn('showLoading: loading element not available', e);
+        }
+        // hide results if present
+        try {
+            if (this.hideResults) this.hideResults();
+            else if (this.resultsContainer && this.resultsContainer.classList) this.resultsContainer.classList.add('hidden');
+        } catch (e) {
+            console.warn('showLoading: unable to hide results', e);
+        }
+        // hide context container if present
+        try {
+            if (this.contextContainer && this.contextContainer.classList) this.contextContainer.classList.add('hidden');
+        } catch (e) {
+            console.warn('showLoading: contextContainer not available', e);
+        }
+        if (this.updateWindowSize) this.updateWindowSize();
     }
 
     hideLoading() {
-        this.loading.classList.add('hidden');
+        try {
+            if (this.loading && this.loading.classList) this.loading.classList.add('hidden');
+        } catch (e) {
+            console.warn('hideLoading: loading element not available', e);
+        }
     }
 
     focusInput() {
@@ -446,6 +567,20 @@ class FloatingAssistantUI {
     hideWindow() {
         if (window.electronAPI) {
             window.electronAPI.hideWindow();
+        }
+    }
+
+    async launchApp(app) {
+        try {
+            // use exposed API from preload
+            if (window.system && window.system.launchApp) {
+                return await window.system.launchApp(app);
+            }
+            // fallback: use ipc
+            return await window.api.invoke('launch-app', app);
+        } catch (err) {
+            console.error('launch-app error', err);
+            return false;
         }
     }
 
@@ -489,12 +624,6 @@ class FloatingAssistantUI {
         }
     }
 
-    // updateWindowSize() {
-    //     const height = document.body.scrollHeight + 40; // Add padding
-    //     if (window.electronAPI) {
-    //         window.electronAPI.resizeWindow(Math.max(80, Math.min(600, height)));
-    //     }
-    // }
     updateWindowSize() {
         const height = document.body.scrollHeight + 40; // Add padding
         if (window.electronAPI) {
