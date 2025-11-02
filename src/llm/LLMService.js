@@ -73,9 +73,20 @@ class LLMService {
         try {
             if (this.currentProvider === 'openai' && this.chain) {
                 const vars = await this.memory.loadMemoryVariables({});
-                const input = context ? `Context: ${context}\n\nQuery: ${query}` : query;
+                
+                // Handle different types of context
+                let contextStr = '';
+                if (typeof context === 'string') {
+                    // If context is directly provided as a string (file content)
+                    contextStr = `Document content:\n${context}\n\n`;
+                } else if (context && Object.keys(context).length > 0) {
+                    // If context is an object (screen context)
+                    contextStr = `Context:\n${JSON.stringify(context, null, 2)}\n\n`;
+                }
+                
+                const input = contextStr ? `${contextStr}Query: ${query}` : query;
                 const response = await this.chain.invoke({ input, ...vars });
-                return response.content; // ✅ Removed duplicate saveContext
+                return response.content;
             } else {
                 const prompt = this.buildPrompt(query, context);
                 return await this.callLLM(prompt);
@@ -126,8 +137,13 @@ class LLMService {
     buildPrompt(query, context) {
         let prompt = `You are a helpful AI assistant integrated into a desktop productivity app. `;
 
-        if (context) {
-            prompt += `Context: ${context}\n\n`;
+        // Handle different types of context
+        if (typeof context === 'string') {
+            // If context is directly provided as a string (file content)
+            prompt += `Document content:\n${context}\n\n`;
+        } else if (context && Object.keys(context).length > 0) {
+            // If context is an object (screen context)
+            prompt += `Context:\n${JSON.stringify(context, null, 2)}\n\n`;
         }
 
         prompt += `User query: ${query}\n\n`;

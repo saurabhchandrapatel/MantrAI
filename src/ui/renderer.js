@@ -1,9 +1,15 @@
+
 class FloatingAssistantUI {
     constructor() {
         console.log('FloatingAssistantUI constructor called');
         
         this.searchInput = document.getElementById('search-input');
         this.searchBtn = document.getElementById('search-btn');
+        this.settingsBtn = document.getElementById('settings-btn');
+        this.fileUploadBtn = document.getElementById('file-upload-btn');
+        this.fileInput = document.getElementById('file-input');
+        
+        this.currentFile = null;
         this.resultsContainer = document.getElementById('results-container');
         this.resultsContent = document.getElementById('results-content');
         this.closeBtn = document.getElementById('close-btn');
@@ -23,13 +29,113 @@ class FloatingAssistantUI {
         
         this.currentResponse = '';
         this.currentContext = null;
+
+        this.searchInput = document.getElementById('search-input');
+        this.suggestionsContainer = document.getElementById('suggestions');
+        this.installedApps = [];
+        this.filteredApps = [];
         this.init();
     }
 
-    init() {
+    async init() {
         this.setupEventListeners();
         this.setupIPCListeners();
+        
+        await this.loadInstalledApps();
+        console.log('installedApps count:', this.installedApps.length);
+
+        // Listen for progressive background updates (icons) from main process
+        try {
+            if (window.installedAppsAPI && window.installedAppsAPI.onUpdated) {
+                window.installedAppsAPI.onUpdated((event, updated) => {
+                    try {
+                        this.installedApps = Array.isArray(updated) ? updated : this.installedApps;
+                        console.log('installedApps updated (bg):', this.installedApps.length);
+                        const q = this.searchInput.value || '';
+                        if (q) {
+                            const matches = this.filterApps(q);
+                            this.showSuggestions(matches);
+                        }
+                    } catch (e) {
+                        console.warn('installedAppsAPI.onUpdated handler error', e);
+                    }
+                });
+            }
+        } catch (e) {
+            console.warn('failed to hook installedAppsAPI', e);
+        }
+
         this.focusInput();
+
+    }
+
+    async loadInstalledApps() {
+        try {
+            if (window.system && window.system.getInstalledApps) {
+                this.installedApps = await window.system.getInstalledApps();
+            } else {
+                console.warn('window.system.getInstalledApps not available');
+                this.installedApps = [];
+            }
+        } catch (err) {
+            console.error('loadInstalledApps error', err);
+            this.installedApps = [];
+        }
+    }
+
+    filterApps(query) {
+        if (!query) return [];
+        const q = query.toLowerCase();
+        return this.installedApps.filter(a => (a.Name || '').toLowerCase().includes(q) || (a.AppID || '').toLowerCase().includes(q)).slice(0, 6);
+    }
+
+    pickColor(name) {
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        const hue = Math.abs(hash) % 360;
+        return `hsl(${hue} 60% 35%)`;
+    }
+    // helper: generate circular avatar data URL with initial
+    generateAvatarDataUrl(name, size = 32) {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const bg = this.pickColor(name || 'A');
+        // circle background
+        ctx.fillStyle = bg;
+        ctx.beginPath();
+        ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
+        ctx.fill();
+        // initial
+        const initial = (name || '?').trim().charAt(0).toUpperCase();
+        ctx.fillStyle = '#fff';
+        ctx.font = `${Math.round(size * 0.5)}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(initial, size/2, size/2 + 1);
+        return canvas.toDataURL();
+    }
+
+
+    showSuggestions(list) {
+        if (!this.suggestionsContainer) return;
+        if (!list || list.length === 0) {
+            this.suggestionsContainer.style.display = 'none';
+            this.suggestionsContainer.innerHTML = '';
+            return;
+        }
+
+        this.suggestionsContainer.innerHTML = list.map(a => {
+            // if main process can provide icon path or data URL in a.Icon, use it; otherwise generate avatar
+            const iconSrc = a.Icon || this.generateAvatarDataUrl(a.Name || a.AppID || 'A', 40);
+            return `
+            <div class="suggestion-item" data-appid="${a.AppID}">
+                <img class="suggestion-icon" src="${iconSrc}" alt="${(a.Name||'')}" />
+                <span class="suggestion-name">${a.Name}</span>
+            </div>
+            `;
+        }).join('');
+        this.suggestionsContainer.style.display = 'block';
     }
 
     setupEventListeners() {
@@ -43,14 +149,54 @@ class FloatingAssistantUI {
         });
 
         this.searchBtn.addEventListener('click', () => this.handleSearch());
+        this.settingsBtn.addEventListener('click', () => this.handleSettingsPage());
+        this.fileUploadBtn.addEventListener('click', () => this.fileInput.click());
+        this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
         this.captureContextBtn.addEventListener('click', () => this.captureContext());
         this.clearContextBtn.addEventListener('click', () => this.clearContext());
-
         this.closeBtn.addEventListener('click', () => this.hideResults());
         this.copyBtn.addEventListener('click', () => this.copyToClipboard());
-
         const resizeObserver = new ResizeObserver(() => this.updateWindowSize());
         resizeObserver.observe(document.body);
+
+
+        // Add input event listener for suggestions
+        this.searchInput.addEventListener('input', (e) => {
+            const value = e.target.value;
+            console.log('search input:', value);
+            const matches = this.filterApps(value);
+            this.showSuggestions(matches);
+        });
+
+        // Handle clicking outside suggestions
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.suggestions-container') && !e.target.closest('#search-input')) {
+                if (this.suggestionsContainer) this.suggestionsContainer.style.display = 'none';
+            }
+        });
+
+        // Handle clicking on a suggestion
+
+        // Handle suggestion clicks
+        if (this.suggestionsContainer) {
+            this.suggestionsContainer.addEventListener('click', async (e) => {
+                const item = e.target.closest('.suggestion-item');
+                if (!item) return;
+                const appId = item.dataset.appid;
+                console.log('launching', appId);
+                if (window.system && window.system.launchApp) {
+                    const ok = await window.system.launchApp(appId);
+                    console.log('launch result', ok);
+                    if (ok) {
+                        this.searchInput.value = '';
+                        this.showSuggestions([]);
+                    } else {
+                        this.displayError('Failed to launch app');
+                    }
+                }
+            });
+        }
+
     }
 
     setupIPCListeners() {
@@ -83,12 +229,18 @@ class FloatingAssistantUI {
 
         this.showLoading();
         
+        // Add file context indicator if a file is loaded
+        let fullQuery = query;
+        if (this.currentFile) {
+            fullQuery = `[File: ${this.currentFile.name}] ${query}`;
+        }
+        
         try {
             if (window.electronAPI) {
-                const response = await window.electronAPI.processQuery(query, this.currentContext);
+                const response = await window.electronAPI.processQuery(fullQuery, this.currentFile ? this.currentFile.content : this.currentContext);
                 this.displayResults(response);
             } else {
-                const response = this.getDemoResponse(query);
+                const response = this.getDemoResponse(fullQuery);
                 this.displayResults(response);
             }
         } catch (error) {
@@ -97,6 +249,17 @@ class FloatingAssistantUI {
         } finally {
             this.hideLoading();
         }
+    }
+
+    async handleSettingsPage() {
+        
+        // todo open settings page
+
+        // if (window.electronAPI) {
+        //     window.electronAPI.openSettings();
+        // } else {
+        //     this.displayError('Settings page not available in demo mode.');
+        // }
     }
 
     async captureContext() {
@@ -286,12 +449,60 @@ class FloatingAssistantUI {
         }
     }
 
+    async handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        try {
+            // Update button to show selected file
+            this.fileUploadBtn.innerHTML = `
+                <svg class="option-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                    <polyline points="13 2 13 9 20 9"></polyline>
+                </svg>
+                <span class="file-name">${file.name}</span>
+            `;
+            
+            this.currentFile = file;
+            this.searchInput.placeholder = `Ask a question about ${file.name}...`;
+            
+            // Store file content in memory
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const content = e.target.result;
+                if (window.electronAPI) {
+                    await window.electronAPI.setFileContext(file.name, content);
+                }
+            };
+            reader.readAsText(file);
+            
+        } catch (error) {
+            console.error('Error handling file:', error);
+            this.displayError('Failed to process file. Please try again.');
+        }
+    }
+
+    handleSettingsPage() {
+        if (window.electronAPI) {
+            window.electronAPI.openSettings();
+            this.hideWindow(); // Hide the main window when opening settings
+        }
+    }
+
+    // updateWindowSize() {
+    //     const height = document.body.scrollHeight + 40; // Add padding
+    //     if (window.electronAPI) {
+    //         window.electronAPI.resizeWindow(Math.max(80, Math.min(600, height)));
+    //     }
+    // }
     updateWindowSize() {
         const height = document.body.scrollHeight + 40; // Add padding
         if (window.electronAPI) {
-            window.electronAPI.resizeWindow(Math.max(80, Math.min(600, height)));
+            // allow up to 800px or adjust as needed
+            window.electronAPI.resizeWindow(Math.max(250, Math.min(800, height)));
         }
     }
+
 
     copyToClipboard() {
         if (this.currentResponse) {
@@ -319,5 +530,6 @@ class FloatingAssistantUI {
 
 // Initialize the UI when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new FloatingAssistantUI();
-});
+    const ui = new FloatingAssistantUI();
+    ui.init().catch(err => console.error('ui.init error', err));
+})

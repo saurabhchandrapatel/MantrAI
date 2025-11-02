@@ -4,22 +4,29 @@
     box-sizing: border-box;
 }
 
+html, body {
+  transition: height 0.2s ease;
+}
+
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     background: transparent;
-    overflow: hidden;
+    overflow-y: hidden;      /* ✅ allow scrolling if content exceeds window height */
+    overflow-x: hidden;
     -webkit-app-region: drag;
     color: #FFFFFF;
+    min-height: 100vh;
 }
 
 #app {
     width: 100vw;
-    height: 100vh;
+    min-height: 100vh;      /* ✅ use min-height instead of 700vh */
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    padding: 20px;
+    padding: 10px;
 }
 
 .search-container {
@@ -93,6 +100,10 @@ body {
     margin-top: 16px;
     border-top: 1px solid #333;
     padding-top: 16px;
+    opacity: 1;
+    visibility: visible;
+    -webkit-app-region: no-drag;  /* Ensure the container is interactive */
+    z-index: 1000;  /* Make sure it's above other elements */
 }
 
 .option-row {
@@ -100,6 +111,11 @@ body {
     align-items: center;
     gap: 12px;
     position: relative;
+    opacity: 1;
+    visibility: visible;
+    -webkit-app-region: no-drag;  /* Ensure the row is interactive */
+    z-index: 1000;  /* Make sure it's above other elements */
+    min-height: 40px;  /* Ensure minimum height for visibility */
 }
 
 .option-btn {
@@ -114,6 +130,9 @@ body {
     cursor: pointer;
     font-size: 14px;
     transition: all 0.2s;
+    opacity: 1;
+    visibility: visible;
+    -webkit-app-region: no-drag;  /* Make sure buttons are clickable in Electron */
 }
 
 .option-btn:hover {
@@ -133,6 +152,20 @@ body {
 .option-btn:hover .option-icon,
 .option-btn.active .option-icon {
     opacity: 1;
+}
+
+#file-input {
+    display: none;
+}
+
+.file-name {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: #8B8B8B;
+    margin-left: 8px;
 }
 
 .settings-icon {
@@ -229,7 +262,7 @@ body {
     width: 100%;
     max-width: 560px;
     margin-top: 12px;
-    background: rgba(255, 255, 255, 0.95);
+    background: transparent;
     backdrop-filter: blur(20px);
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
@@ -278,19 +311,19 @@ body {
     gap: 12px;
     margin-top: 12px;
     padding: 16px;
-    background: rgba(255, 255, 255, 0.95);
+    background: transparent;
     backdrop-filter: blur(20px);
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #666;
+    color: #fff;
     font-size: 14px;
 }
 
 .spinner {
     width: 16px;
     height: 16px;
-    border: 2px solid #e0e0e0;
+    border: 2px solid rgba(255, 255, 255, 0.2);
     border-top: 2px solid #007AFF;
     border-radius: 50%;
     animation: spin 1s linear infinite;
@@ -384,7 +417,7 @@ body {
 
 .response-content {
     line-height: 1.6;
-    color: #333;
+    color: #f1f1f1;
 }
 
 .response-content h1 {
@@ -406,7 +439,7 @@ body {
 }
 
 .response-content code {
-    background: #f5f5f5;
+    background: transparent;
     padding: 2px 6px;
     border-radius: 4px;
     font-family: 'Consolas', 'Monaco', monospace;
@@ -415,7 +448,7 @@ body {
 }
 
 .response-content pre {
-    background: #f8f9fa;
+    background: transparent;
     border: 1px solid #e9ecef;
     border-radius: 6px;
     padding: 12px;
@@ -426,7 +459,7 @@ body {
 .response-content pre code {
     background: none;
     padding: 0;
-    color: #333;
+    color: #fefefe;
     font-size: 13px;
 }
 
@@ -441,10 +474,59 @@ body {
 
 .response-content strong {
     font-weight: 600;
-    color: #333;
+    color: #f5eeee;
 }
 
 .response-content em {
     font-style: italic;
-    color: #666;
+    color: #e2dddd;
 }
+
+
+.suggestions-container {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #2D2D2D;
+    border-radius: 6px;
+    margin-top: 4px;
+    max-height: 200px;
+    overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+    display: none;
+}
+
+.suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #FFFFFF;
+}
+
+
+.suggestion-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 18px;
+    object-fit: cover;
+    flex: 0 0 36px;
+    background: rgba(255,255,255,0.04);
+}
+
+.suggestion-item:hover {
+    background: #363636;
+}
+ 
+
+.suggestion-name {
+    flex: 1;
+}
+
+
+.search-input-container { position: relative; } /* add this */
+.suggestions-container { left: 0; right: 0; top: 100%; /* already present */ z-index: 2000; }
+

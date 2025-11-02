@@ -1,14 +1,20 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('screenContext', {
-  get: () => ipcRenderer.invoke('get-screen-context')
+  get: () => ipcRenderer.invoke('get-screen-context'),
+  resizeWindow: (height) => ipcRenderer.send('resize-window', height)
 });
 
+
+
+
 contextBridge.exposeInMainWorld('electronAPI', {
-  processQuery: (query) => ipcRenderer.invoke('process-query', query),
+  processQuery: (query, context) => ipcRenderer.invoke('process-query', { query, context }),
   getProductivityReport: (period) => ipcRenderer.invoke('get-productivity-report', period),
   hideWindow: () => ipcRenderer.send('hide-window'),
   resizeWindow: (height) => ipcRenderer.send('resize-window', height),
+  openSettings: () => ipcRenderer.send('open-settings'),
+  setFileContext: (filename, content) => ipcRenderer.invoke('set-file-context', { filename, content }),
   
   // Context management
   addContext: (context) => ipcRenderer.invoke('add-context', context),
@@ -23,4 +29,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Remove listeners
   removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
+});
+
+
+contextBridge.exposeInMainWorld('system', {
+    getInstalledApps: () => ipcRenderer.invoke('get-installed-apps'),
+    launchApp: (appPath) => ipcRenderer.invoke('launch-app', appPath)
+});
+
+// Event bridge for installed-apps updates (background icon enrichment)
+contextBridge.exposeInMainWorld('installedAppsAPI', {
+  onUpdated: (callback) => ipcRenderer.on('installed-apps-updated', callback)
 });
