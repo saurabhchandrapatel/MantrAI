@@ -11,3 +11,5 @@ src/data/*.db-journal
 Thumbs.db
 *.tmp
 *.temp
+/src/data/*
+/data/settings.json
