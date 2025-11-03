@@ -4,7 +4,7 @@ A Windows desktop application built with Electron that provides a floating AI as
 
 ## Features
 
-- **MantrAI Transparent UI**: Center-screen overlay with blur effects
+- **MantrAI  Transparent UI**: Center-screen overlay with blur effects
 - **AI Integration**: Supports local (Ollama) and cloud (OpenAI) LLM providers
 - **Activity Tracking**: Monitors app usage and categorizes productivity
 - **Productivity Reports**: AI-generated daily/weekly insights
