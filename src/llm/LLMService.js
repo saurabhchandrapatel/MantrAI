@@ -3,6 +3,9 @@ const { ChatPromptTemplate, MessagesPlaceholder } = require('@langchain/core/pro
 const { InMemoryChatMessageHistory } = require('@langchain/core/chat_history');
 const { RunnableSequence } = require('@langchain/core/runnables');
 const { ConversationSummaryBufferMemory } = require("@langchain/classic/memory");
+const { chromeTools } = require('../agent/tools');
+const { ToolNode } =  require("@langchain/langgraph/prebuilt");
+const { StateGraph, END, START, MessagesAnnotation } = require("@langchain/langgraph");
 
 const axios = require('axios');
 
@@ -25,6 +28,7 @@ class LLMService {
         this.llm = null;
         this.chain = null;
         this.memory = null;
+        this.modelWithTools = null
         this.initializeLangChain();
     }
 
@@ -36,6 +40,9 @@ class LLMService {
                 temperature: 0.7,
                 maxTokens: 500
             });
+
+            this.modelWithTools = this.llm.bindTools(chromeTools);
+
             
 
             this.memory = new ConversationSummaryBufferMemory({
@@ -66,6 +73,38 @@ class LLMService {
                     return output;
                 }
             ]);
+
+            this.toolNode = new ToolNode(chromeTools);
+            this.workflow = new StateGraph(MessagesAnnotation)
+            .addNode("agent", this.callModel)
+            .addNode("tools", this.toolNode)
+            .addEdge(START, "agent")
+            .addConditionalEdges("agent", (state) => this.shouldContinue(state))
+            .addEdge("tools", "agent");
+            this.agent = this.workflow.compile()
+            // await this.agent.invoke({ messages: [{ role: "user", content: "Hi!" }] });
+
+        }
+    }
+
+        
+    shouldContinue(state) {
+        const messages = state.messages;
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage.additional_kwargs?.tool_calls?.length) {
+            return "tools";
+        }
+        return END;
+    }
+
+    async callModel(state) {
+        const messages = state.messages;
+         try {
+            const response = await this.modelWithTools.invoke(messages);
+            return { messages: [response] };
+        } catch (err) {
+            console.error("Tool error:", err);
+            return { messages: [{ role: "system", content: "Tool execution failed." }] };
         }
     }
 
@@ -257,6 +296,7 @@ class LLMService {
     switchProvider(provider) {
         if (this.providers[provider]) {
             this.currentProvider = provider;
+            this.initializeLangChain(); // reinit everything
             console.log(`Switched to LLM provider: ${provider}`);
             return true;
         }
