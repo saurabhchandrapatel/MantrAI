@@ -97,25 +97,21 @@ body {
 }
 
 .bottom-options {
-    margin-top: 16px;
+    margin-top: 10px;
     border-top: 1px solid #333;
-    padding-top: 16px;
+    padding-top: 10px;
     opacity: 1;
     visibility: visible;
     -webkit-app-region: no-drag;  /* Ensure the container is interactive */
     z-index: 1000;  /* Make sure it's above other elements */
 }
 
+
 .option-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    position: relative;
-    opacity: 1;
-    visibility: visible;
-    -webkit-app-region: no-drag;  /* Ensure the row is interactive */
-    z-index: 1000;  /* Make sure it's above other elements */
-    min-height: 40px;  /* Ensure minimum height for visibility */
+  display: flex;
+  gap: 8px;
+  justify-content: left;
+  align-items: center;
 }
 
 .option-btn {
@@ -196,7 +192,7 @@ body {
 #capture-context-btn:hover {
     background: #5a6268;
 }
-
+/* 
 .context-container {
     width: 100%;
     max-width: 560px;
@@ -208,8 +204,8 @@ body {
     border: 1px solid rgba(0, 0, 0, 0.05);
     overflow: hidden;
     -webkit-app-region: no-drag;
-}
-
+} */
+/* 
 .context-header {
     display: flex;
     justify-content: space-between;
@@ -219,8 +215,8 @@ body {
     font-size: 13px;
     font-weight: 600;
     color: #555;
-}
-
+} */
+/* 
 .clear-context-btn {
     background: none;
     border: 1px solid #ddd;
@@ -230,20 +226,20 @@ body {
     padding: 2px 6px;
     cursor: pointer;
     transition: all 0.2s;
-}
-
+} */
+/* 
 .clear-context-btn:hover {
     background: #eee;
     border-color: #ccc;
-}
-
+} */
+/* 
 .context-content {
     padding: 12px;
     font-size: 12px;
     color: #fff;
     max-height: 150px;
     overflow-y: auto;
-}
+} */
 
 .context-content ul {
     list-style-type: none;
@@ -281,15 +277,15 @@ body {
     color: #333;
 }
 
-.results-actions {
+/* .results-actions {
     display: flex;
     gap: 8px;
     padding: 12px 16px;
     border-top: 1px solid rgba(0, 0, 0, 0.1);
-    background: rgba(248, 248, 248, 0.8);
-}
+    background: #2D2D2D;
+} */
 
-.action-btn {
+/* .action-btn {
     padding: 6px 12px;
     border: 1px solid #ddd;
     border-radius: 6px;
@@ -303,7 +299,7 @@ body {
 .action-btn:hover {
     background: #f0f0f0;
     border-color: #ccc;
-}
+} */
 
 .loading {
     display: flex;
@@ -553,3 +549,117 @@ body {
     font-size: 12px;
 }
 
+
+
+.option-btn svg {
+  stroke-width: 1.8;
+  transition: transform 0.2s ease, color 0.3s;
+}
+
+.option-btn:hover svg {
+  transform: scale(1.1);
+  color: #00bfa5;
+}
+
+.option-btn.active svg {
+  color: #00bfa5;
+}
+
+
+
+/* ===============================
+   🔹 Harmonize Results + Context
+   =============================== */
+
+/* Match container background and padding */
+.results-actions {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: #2D2D2D;
+  border-top: 1px solid #333;
+  border-radius: 6px;
+}
+
+/* Make action buttons look like option-btn */
+.action-btn {
+  background: #2D2D2D;
+  color: #8B8B8B;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.action-btn:hover {
+  background: #363636;
+  color: #FFFFFF;
+}
+
+.action-btn svg {
+  stroke-width: 1.8;
+  transition: transform 0.2s ease, color 0.3s;
+}
+
+.action-btn:hover svg {
+  transform: scale(1.1);
+  color: #00bfa5;
+}
+
+/* Keep context container visually aligned */
+.context-container {
+  width: 100%;
+  max-width: 800px;
+  background: #1E1E1E;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  border: 1px solid #333;
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.context-header {
+  background: #2D2D2D;
+  color: #8B8B8B;
+  padding: 8px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 500;
+  border-bottom: 1px solid #333;
+}
+
+/* Harmonize clear-context-btn */
+.clear-context-btn {
+  background: #2D2D2D;
+  border: none;
+  border-radius: 6px;
+  color: #8B8B8B;
+  font-size: 13px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.clear-context-btn:hover {
+  background: #363636;
+  color: #FFFFFF;
+}
+
+.context-content {
+  background: #1E1E1E;
+  color: #FFFFFF;
+  padding: 12px 16px;
+  font-size: 13px;
+  max-height: 160px;
+  overflow-y: auto;
+  line-height: 1.5;
+}

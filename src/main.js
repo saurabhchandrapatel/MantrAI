@@ -237,6 +237,9 @@ app.whenReady().then(async () => {
     }
   });
 
+  ipcMain.handle('process-action', async (event, { query, context }) => {
+    return await llmService.processAction(query, context);
+  });
   ipcMain.handle('process-query', async (event, { query, context }) => {
     try {
       // Priority: explicit context passed in > file-uploaded context > extra context (screen capture) > live screen capture
@@ -250,12 +253,9 @@ app.whenReady().then(async () => {
           context = formatContextForLLM(screenContext);
         }
       }
-
       let response = await llmService.processQuery(query, context);
-      console.log('ChatGPT response:', response);
       return response;
     } catch (error) {
-      console.error('Error processing query:', error);
       return `Error: ${error.message}. Please check your OpenAI API key.`;
     }
   });

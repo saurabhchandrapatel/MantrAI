@@ -1,73 +1,132 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MantrAI Assistant</title>
-    <link rel="stylesheet" href="styles.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MantrAI Assistant</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
-<body> 
-    <div id="app">
-        <div id="search-container" class="search-container">
-            <div class="search-box">
-                <div class="search-label">
-                    <span class="label-text">Describe what you want the AI agent to do...</span>
-                </div>
-                
-                <div class="search-input-container">
-                    <input 
-                        type="text" 
-                        id="search-input" 
-                        placeholder="Ask something, or switch to Apps..."
-                        autocomplete="off"
-                    />
-                    <button id="search-btn" class="search-btn">⏎</button>
-                    <div id="suggestions" class="suggestions-container"></div>
-                </div>
-
-                <div class="bottom-options">
-                    <div class="option-row">
-                        <button id="agent-btn" class="option-btn active">Agent</button>
-                        <button id="apps-btn" class="option-btn">Apps</button>
-                        <button id="file-upload-btn" class="option-btn">
-                            Upload File
-                        </button>
-                        <input type="file" id="file-input" class="hidden" />
-                        <div class="settings-icon">
-                            <button id="settings-btn" class="option-btn">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                    <circle cx="12" cy="12" r="3"></circle>
-                                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                                </svg>
-                                
-                            </button>
-                            
-                        </div>
-                    </div>
-                </div>
-                <div id="loading" class="loading hidden">
-                    <div class="spinner"></div>
-                    <span>Processing...</span>
-                </div>
-                <div id="results-container" class="results-container hidden">
-                    <div id="results-content" class="results-content"></div>
-                    <div class="results-actions">
-                        <button id="close-btn" class="action-btn">Close</button>
-                        <button id="copy-btn" class="action-btn">Copy</button>
-                        <button id="capture-context-btn" class="search-btn" title="Capture Context">Context</button>
-                    </div>
-                </div>
-                
-                <div id="context-container" class="context-container hidden">
-                    <div class="context-header">
-                        <span>📝 Context</span>
-                        <button id="clear-context-btn" class="clear-context-btn">Clear</button>
-                    </div>
-                    <div id="context-content" class="context-content"></div>
-                </div>
-            </div>
+<body>
+  <div id="app">
+    <div id="search-container" class="search-container">
+      <div class="search-box">
+        <div class="search-label">
+          <span class="label-text">Describe what you want the AI agent to do...</span>
         </div>
-    </div> 
-    <script src="renderer.js"></script>
+
+        <div class="search-input-container">
+          <input
+            type="text"
+            id="search-input"
+            placeholder="Ask something, or switch to Apps..."
+            autocomplete="off"
+          />
+          <button id="search-btn" class="search-btn" title="Run">⏎</button>
+          <div id="suggestions" class="suggestions-container"></div>
+        </div>
+
+        <!-- Icon toolbar -->
+        <div class="bottom-options">
+          <div class="option-row">
+
+            <!-- ask -->
+
+            <button id="ask-btn" class="option-btn active" title="Ask Mode">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4S14.21 4 12 4s-4 1.79-4 4 1.79 4 4 4z"></path>
+                <path d="M6 20v-1a6 6 0 0 1 12 0v1"></path>
+              </svg>
+            </button>
+
+            <!-- Agent -->
+            <button id="agent-btn" class="option-btn" title="Agent Mode">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4S14.21 4 12 4s-4 1.79-4 4 1.79 4 4 4z"></path>
+                <path d="M6 20v-1a6 6 0 0 1 12 0v1"></path>
+              </svg>
+            </button>
+
+            <!-- Apps -->
+            <button id="apps-btn" class="option-btn" title="Apps Mode">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
+            </button>
+
+            <!-- File Upload -->
+            <button id="file-upload-btn" class="option-btn" title="Upload File">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M12 5v14m0 0l-6-6m6 6l6-6"></path>
+              </svg>
+            </button>
+            <input type="file" id="file-input" class="hidden" />
+
+            <!-- Settings -->
+            <button id="settings-btn" class="option-btn" title="Settings">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path
+                  d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 
+                     2 0 0 1 0 2.83 2 2 0 0 1-2.83 
+                     0l-.06-.06a1.65 1.65 0 0 0-1.82-.33
+                     1.65 1.65 0 0 0-1 1.51V21a2 
+                     2 0 0 1-2 2 2 2 0 0 1-2-2v-.09
+                     A1.65 1.65 0 0 0 9 19.4
+                     a1.65 1.65 0 0 0-1.82.33l-.06.06
+                     a2 2 0 0 1-2.83 0 2 2 0 0 1
+                     0-2.83l.06-.06a1.65 1.65 0 0 0
+                     .33-1.82 1.65 1.65 0 0 0-1.51-1H3
+                     a2 2 0 0 1-2-2 2 2 0 0 1
+                     2-2h.09A1.65 1.65 0 0 0 4.6 9
+                     a1.65 1.65 0 0 0-.33-1.82l-.06-.06
+                     a2 2 0 0 1 0-2.83 2 2 0 0 1
+                     2.83 0l.06.06a1.65 1.65 0 0 0
+                     1.82.33H9a1.65 1.65 0 0 0
+                     1-1.51V3a2 2 0 0 1 2-2 2 2
+                     0 0 1 2 2v.09a1.65 1.65 0 0 0
+                     1 1.51 1.65 1.65 0 0 0
+                     1.82-.33l.06-.06a2 2 0 0 1
+                     2.83 0 2 2 0 0 1 0 2.83l-.06.06
+                     a1.65 1.65 0 0 0-.33 1.82V9
+                     a1.65 1.65 0 0 0 1.51 1H21
+                     a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09
+                     a1.65 1.65 0 0 0-1.51 1z"
+                ></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="loading hidden">
+          <div class="spinner"></div>
+          <span>Processing...</span>
+        </div>
+
+        <!-- Results -->
+        <div id="results-container" class="results-container hidden">
+          <div id="results-content" class="results-content"></div>
+          <!-- <div class="results-actions">
+            <button id="close-btn" class="action-btn" title="Close">✖</button>
+            <button id="copy-btn" class="action-btn" title="Copy">📋</button>
+            <button id="capture-context-btn" class="search-btn" title="Capture Context">🧠</button>
+          </div> -->
+        </div>
+
+        <!-- Context Section -->
+        <!-- <div id="context-container" class="context-container hidden">
+          <div class="context-header">
+            <span>📝 Context</span>
+            <button id="clear-context-btn" class="clear-context-btn" title="Clear Context">🗑</button>
+          </div>
+          <div id="context-content" class="context-content"></div>
+        </div> -->
+      </div>
+    </div>
+  </div>
+  <script src="renderer.js"></script>
 </body>
 </html>

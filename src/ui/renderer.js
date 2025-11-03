@@ -19,27 +19,20 @@ class FloatingAssistantUI {
         this.clearContextBtn = document.getElementById('clear-context-btn');
         this.contextContainer = document.getElementById('context-container');
         this.contextContent = document.getElementById('context-content');
-        
-        console.log('Elements found:', {
-            searchInput: !!this.searchInput,
-            searchBtn: !!this.searchBtn,
-            resultsContainer: !!this.resultsContainer,
-            captureContextBtn: !!this.captureContextBtn
-        });
-        
         this.currentResponse = '';
         this.currentContext = null;
         
-        this.searchInput = document.getElementById('search-input');
+         
         this.suggestionsContainer = document.getElementById('suggestions');
-    this.contextIndicator = document.getElementById('context-indicator');
+        this.contextIndicator = document.getElementById('context-indicator');
  
         this.agentBtn = document.getElementById('agent-btn');
+        this.askBtn = document.getElementById('ask-btn');
         this.appsBtn = document.getElementById('apps-btn');
         this.fileUploadBtn = document.getElementById('file-upload-btn');
         this.fileInput = document.getElementById('file-input');
 
-        this.mode = 'agent'; // 'agent' | 'apps' | 'file'
+        this.mode = 'agent'; // 'agent' | 'apps' | 'ask' | 'file'
         this.installedApps = [];
         this.filteredApps = [];
         this.isLaunching = false;
@@ -61,7 +54,8 @@ class FloatingAssistantUI {
                         this.installedApps = Array.isArray(updated) ? updated : this.installedApps;
                         console.log('installedApps updated (bg):', this.installedApps.length);
                         const q = this.searchInput.value || '';
-                        if (q && this.mode === 'apps') {
+
+                        if (q && (this.mode === 'apps' || this.mode === 'ask')) {
                             const matches = this.filterApps(q);
                             this.showSuggestions(matches);
                         }
@@ -97,9 +91,11 @@ class FloatingAssistantUI {
         this.mode = newMode;
         // UI active state
         this.agentBtn.classList.toggle('active', newMode === 'agent');
+        this.askBtn.classList.toggle('active', newMode === 'ask');
         this.appsBtn.classList.toggle('active', newMode === 'apps');
         // adjust placeholder
-        if (newMode === 'agent') this.searchInput.placeholder = "Ask the assistant...";
+        if (newMode === 'agent') this.searchInput.placeholder = "Ask the assistant do to your task...";
+        else if (newMode === 'ask') this.searchInput.placeholder = "Ask about anything...";
         else if (newMode === 'apps') this.searchInput.placeholder = "Search installed apps...";
         else if (newMode === 'file') this.searchInput.placeholder = "Upload a file to ask questions about it...";
         this.showSuggestions([]); // clear
@@ -170,7 +166,7 @@ class FloatingAssistantUI {
         const submit = async () => {
             const query = this.searchInput.value.trim();
             if (!query) return;
-            if (this.mode === 'agent') {
+            if (this.mode === 'ask') {
                 // send to LLM
                 try {
                     if (this.showLoading) this.showLoading();
@@ -201,7 +197,41 @@ class FloatingAssistantUI {
                 } finally {
                     if (this.hideLoading) this.hideLoading();
                 }
-            } else if (this.mode === 'apps') {
+            }
+            else if (this.mode === 'agent') {
+              // send to LLM
+              try {
+                    if (this.showLoading) this.showLoading();
+
+                    let response = null;
+
+                     // Preferred: system API exposed by preload
+                    if (window.system && typeof window.system.processQuery === 'function') {
+                        response = await window.system.processQuery(query);
+                    }
+                    // Next: electronAPI bridge
+                    else if (window.electronAPI && typeof window.electronAPI.processAction === 'function') {
+                        response = await window.electronAPI.processAction(query);
+                    }
+                    // Older fallback: ipc invoke wrapper if present
+                    else if (window.api && typeof window.api.invoke === 'function') {
+                        response = await window.api.invoke('process-action', { query, context: null });
+                    }
+                    // Final fallback: demo responder
+                    else {
+                        response = this.getDemoResponse(query);
+                    }
+
+                    this.displayResults(response);
+
+
+              }catch (err) {
+                    console.error('process-action error', err);
+                    this.displayError('Failed to contact assistant. See console for details.');
+              }
+
+            } 
+            else if (this.mode === 'apps') {
                 // if exact match, launch first result
                 const matches = this.filterApps(query);
                 if (matches.length > 0) {

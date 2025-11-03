@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('screenContext', {
 
 contextBridge.exposeInMainWorld('electronAPI', {
   processQuery: (query, context) => ipcRenderer.invoke('process-query', { query, context }),
+  processAction: (query, context) => ipcRenderer.invoke('process-action', { query, context }),
   getProductivityReport: (period) => ipcRenderer.invoke('get-productivity-report', period),
   hideWindow: () => ipcRenderer.send('hide-window'),
   resizeWindow: (height) => ipcRenderer.send('resize-window', height),
