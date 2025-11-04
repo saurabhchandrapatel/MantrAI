@@ -192,6 +192,7 @@ class FloatingAssistantUI {
                     }
 
                     this.displayResults(response);
+                    if (this.hideLoading) this.hideLoading();
                 } catch (err) {
                     console.error('process-query error', err);
                     this.displayError('Failed to contact assistant. See console for details.');

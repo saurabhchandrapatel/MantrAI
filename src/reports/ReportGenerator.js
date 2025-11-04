@@ -61,11 +61,11 @@ class ReportGenerator {
         const summary = await this.db.getDailySummary(dateStr);
         const topApps = await this.db.getTopApps(dateStr, 5);
         const productivityScore = await this.db.getProductivityScore(dateStr);
-    const sessionBounds = await this.db.getSessionBounds(dateStr);
+        const sessionBounds = await this.db.getSessionBounds(dateStr);
 
-    const loginTime = sessionBounds && sessionBounds.first_ts ? new Date(sessionBounds.first_ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
-    const logoutTime = sessionBounds && sessionBounds.last_ts ? new Date(sessionBounds.last_ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
-    const sessionDuration = (sessionBounds && sessionBounds.first_ts && sessionBounds.last_ts) ? Math.round((new Date(sessionBounds.last_ts) - new Date(sessionBounds.first_ts)) / 1000) : 0;
+        const loginTime = sessionBounds && sessionBounds.first_ts ? new Date(sessionBounds.first_ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
+        const logoutTime = sessionBounds && sessionBounds.last_ts ? new Date(sessionBounds.last_ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : null;
+        const sessionDuration = (sessionBounds && sessionBounds.first_ts && sessionBounds.last_ts) ? Math.round((new Date(sessionBounds.last_ts) - new Date(sessionBounds.first_ts)) / 1000) : 0;
 
         return {
             type: 'productivity-report',

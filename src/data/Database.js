@@ -5,7 +5,7 @@ let Database;
 try {
   Database = require('better-sqlite3');
 } catch (error) {
-  console.warn('⚠️ better-sqlite3 not available — using in-memory mock DB');
+  console.warn('better-sqlite3 not available — using in-memory mock DB');
   Database = class MockDatabase {
     exec() {}
     prepare() {
@@ -39,9 +39,9 @@ class ActivityDatabase {
       this.db = new Database(this.dbPath);
       this.createTables();
 
-      console.log(`✅ Database initialized at ${this.dbPath}`);
+      console.log(`Database initialized at ${this.dbPath}`);
     } catch (error) {
-      console.error('❌ Failed to initialize database:', error);
+      console.error('Failed to initialize database:', error);
       this.db = new Database(':memory:');
       this.createTables();
     }
@@ -74,40 +74,7 @@ class ActivityDatabase {
         } catch (error) {
         console.error('Error creating tables:', error);
         }
-    }
-
-    
-    // createTables() {
-    //     // Activity tracking table
-    //     this.db.exec(`
-    //         CREATE TABLE IF NOT EXISTS activities (
-    //             id INTEGER PRIMARY KEY AUTOINCREMENT,
-    //             date TEXT NOT NULL,
-    //             timestamp TEXT NOT NULL,
-    //             app_name TEXT NOT NULL,
-    //             duration INTEGER NOT NULL,
-    //             category TEXT NOT NULL,
-    //             productive BOOLEAN NOT NULL,
-    //             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    //         )
-    //     `);
-
-    //     // Create indexes for better performance
-    //     this.db.exec(`
-    //         CREATE INDEX IF NOT EXISTS idx_activities_date ON activities(date);
-    //         CREATE INDEX IF NOT EXISTS idx_activities_app ON activities(app_name);
-    //         CREATE INDEX IF NOT EXISTS idx_activities_category ON activities(category);
-    //     `);
-
-    //     // Settings table for user preferences
-    //     this.db.exec(`
-    //         CREATE TABLE IF NOT EXISTS settings (
-    //             key TEXT PRIMARY KEY,
-    //             value TEXT NOT NULL,
-    //             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    //         )
-    //     `);
-    // }
+    } 
 
     async saveActivity(activityData) {
         const stmt = this.db.prepare(`

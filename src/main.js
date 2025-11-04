@@ -5,16 +5,12 @@ const { getScreenContext, formatContextForLLM } = require('./utils/screenContext
 const ActivityTracker = require('./tracker/ActivityTracker');
 const ReportGenerator = require('./reports/ReportGenerator');
 const { getInstalledApps } = require('get-installed-apps');
- 
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const execAsync = promisify(exec);
 const fsSync = require('fs'); // added to use existsSync
 
-
 require('dotenv').config();
-
-
 
 const llmService = new LLMService();
 const activityTracker = new ActivityTracker();
@@ -139,7 +135,6 @@ function createTray() {
 
 }
 
-
 function setupShortcuts() {
   globalShortcut.register('Alt+Space', () => {
     if (isVisible) {
@@ -152,7 +147,6 @@ function setupShortcuts() {
     }
   });
 }
- 
  
 function validateIconPath(iconPath) {
   if (!iconPath) return null;
@@ -171,8 +165,6 @@ function validateIconPath(iconPath) {
     return null;
   }
 }
-
-
 
 // Create window and start app
 app.whenReady().then(async () => {
@@ -306,7 +298,6 @@ app.whenReady().then(async () => {
   ipcMain.handle('get-installed-apps', async () => {
     try {
         const apps = await getInstalledApps();
-        console.log(apps)
         const normalized = apps
         .map(app => {
 

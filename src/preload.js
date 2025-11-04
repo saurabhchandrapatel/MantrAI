@@ -5,9 +5,6 @@ contextBridge.exposeInMainWorld('screenContext', {
   resizeWindow: (height) => ipcRenderer.send('resize-window', height)
 });
 
-
-
-
 contextBridge.exposeInMainWorld('electronAPI', {
   processQuery: (query, context) => ipcRenderer.invoke('process-query', { query, context }),
   processAction: (query, context) => ipcRenderer.invoke('process-action', { query, context }),
