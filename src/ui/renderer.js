@@ -257,6 +257,13 @@ class FloatingAssistantUI {
         }
        
 
+        if (this.askBtn) {
+            this.askBtn.addEventListener('click', () => {
+                this.setMode('ask');
+                this.hideResults();
+                if (this.searchInput) this.searchInput.focus();
+            });
+        } else console.warn('setupEventListeners: askBtn not found');
 
         if (this.agentBtn) {
             this.agentBtn.addEventListener('click', () => {

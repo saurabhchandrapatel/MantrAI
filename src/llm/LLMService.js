@@ -58,8 +58,9 @@ class LLMService {
             // ✅ Load all tools dynamically (from registry)
             let toolsToBind = [];
             try {
-                const { toolRegistry } = require('../agent/toolRegistry');
-                toolsToBind = toolRegistry?.getAll?.() || [];
+                const { registry } = require('../agent/toolRegistry'); 
+                toolsToBind = registry?.getAll?.() || [];
+
                 console.log(`[LLMService] Binding ${toolsToBind.length} tools`);
             } catch (err) {
                 console.warn("[LLMService] ⚠️ Tool registry not found, continuing without tools.");

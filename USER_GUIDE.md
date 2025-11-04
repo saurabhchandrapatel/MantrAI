@@ -1,4 +1,4 @@
-# 🧠 Floating AI Assistant - User Guide
+# 🧠 MantrAI Assstant Assistant - User Guide
 
 ## Quick Start
 

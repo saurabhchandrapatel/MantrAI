@@ -61,7 +61,7 @@ class ToolRegistry {
     }
     
     getAll() {
-        return Object.values(this.tools).flat().filter(Boolean);
+        return Array.from(this.tools.values());
     }
 
     /**
@@ -69,7 +69,7 @@ class ToolRegistry {
      */
     async discoverToolsFrom(dirPath) {
         const files = fs.readdirSync(dirPath).filter(f => f.endsWith(".js"));
-        console.log(`🔍 [ToolRegistry] Discovering tools in ${dirPath}`);
+        console.log(`[ToolRegistry] Discovering tools in ${dirPath}`);
 
         for (const file of files) {
             const fullPath = path.join(dirPath, file);
@@ -78,14 +78,14 @@ class ToolRegistry {
                 const mod = require(fullPath);
 
                 if (typeof mod === "function") {
-                    console.log(`🧩 Loaded function tool from ${file}`);
+                    console.log(` Loaded function tool from ${file}`);
                     const tool = await mod();
                     if (tool?.name) this.tools.set(tool.name, tool);
                     continue;
                 }
 
                 if (Array.isArray(mod.tools)) {
-                    console.log(`🧩 Loaded ${mod.tools.length} tools from ${file}`);
+                    console.log(` Loaded ${mod.tools.length} tools from ${file}`);
                     for (const tool of mod.tools) {
                         if (tool?.name) this.tools.set(tool.name, tool);
                     }
@@ -93,15 +93,17 @@ class ToolRegistry {
                     // if the module exports individual tool objects
                     for (const [key, val] of Object.entries(mod)) {
                         if (val?.name && val?.func) {
-                            console.log(`🧩 Loaded tool: ${val.name} from ${file}`);
+                            console.log(`Loaded tool: ${val.name} from ${file}`);
                             this.tools.set(val.name, val);
                         }
                     }
                 }
             } catch (err) {
-                console.error(`❌ Error loading ${file}:`, err);
+                console.error(`Error loading ${file}:`, err);
             }
         }
+        console.log(`[ToolRegistry]  Total tools discovered: ${this.tools.size}`);
+
     }
 }
 

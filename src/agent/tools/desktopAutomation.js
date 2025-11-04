@@ -1,17 +1,11 @@
 // src/agent/tools/desktopAutomation.js
 const { DynamicStructuredTool } = require("@langchain/core/tools");
 const { z } = require("zod");
-const { ipcMain, ipcRenderer, shell } = require("electron");
+const { ipcMain, ipcRenderer, shell, clipboard } = require("electron");
 const isRenderer = process.type === "renderer";
 const { mouse, keyboard, Key, Point, Button, straightTo } = require("@nut-tree-fork/nut-js");
 const { exec } = require("child_process");
 const appProfiles = require("../profiles/appProfiles.json");
-let clipboardy = null;
-try {
-  clipboardy = require('clipboardy');
-} catch (err) {
-  console.warn('clipboardy not installed — clipboard read/write will be disabled. Run `npm install clipboardy` to enable.');
-}
 
 /* -------------------- IPC Tool Factory -------------------- */
 function createIPCTool(name, description, schema, handler) {
@@ -156,11 +150,12 @@ async function copySelection() {
   await keyboard.pressKey(Key.LeftControl, Key.C);
   await keyboard.releaseKey(Key.LeftControl, Key.C);
   await sleep(200);
-  if (clipboardy) {
-    const content = await clipboardy.read();
-    return { message: "Copied selection", content };
+  try {
+    const content = clipboard.readText();
+    return { message: 'Copied selection', content };
+  } catch (err) {
+    return { message: 'Copied selection (clipboard read failed)', error: String(err.message) };
   }
-  return { message: "Copied selection (clipboardy not installed)" };
 }
 
 async function pasteClipboard() {
@@ -170,14 +165,20 @@ async function pasteClipboard() {
 }
 
 async function readClipboard() {
-  if (!clipboardy) throw new Error('clipboardy not available. Run `npm install clipboardy`');
-  return await clipboardy.read();
+  try {
+    return clipboard.readText();
+  } catch (err) {
+    throw new Error('Failed to read clipboard: ' + String(err.message));
+  }
 }
 
 async function writeClipboard(text) {
-  if (!clipboardy) throw new Error('clipboardy not available. Run `npm install clipboardy`');
-  await clipboardy.write(String(text || ""));
-  return `Wrote to clipboard (${String(text || '').slice(0,100)})`;
+  try {
+    clipboard.writeText(String(text || ''));
+    return `Wrote to clipboard (${String(text || '').slice(0, 100)})`;
+  } catch (err) {
+    throw new Error('Failed to write clipboard: ' + String(err.message));
+  }
 }
 
 /* -------------------- Schema -------------------- */
