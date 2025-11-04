@@ -164,6 +164,7 @@ class FloatingAssistantUI {
     setupEventListeners() {
         // Enter key or click
         const submit = async () => {
+            if (!this.searchInput) return;
             const query = this.searchInput.value.trim();
             if (!query) return;
             if (this.mode === 'ask') {
@@ -240,43 +241,72 @@ class FloatingAssistantUI {
             }
         };
 
-        this.searchInput.addEventListener('keydown', (e) => {
+        if (this.searchInput) {
+            this.searchInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') {
                 submit();
                 e.preventDefault();
             } else if (e.key === 'Escape') {
-                this.searchInput.value = '';
+                    this.searchInput.value = '';
                 this.showSuggestions([]);
             }
-        });
+            });
+        } else {
+            console.warn('setupEventListeners: searchInput element not found');
+        }
        
 
 
-        this.agentBtn.addEventListener('click', () => {
-            this.setMode('agent');
-            this.hideResults();
-            this.searchInput.focus();
-        });
-        this.appsBtn.addEventListener('click', () => {
-            this.setMode('apps');
-            this.hideResults();
-            this.searchInput.focus();
-        });
+        if (this.agentBtn) {
+            this.agentBtn.addEventListener('click', () => {
+                this.setMode('agent');
+                this.hideResults();
+                if (this.searchInput) this.searchInput.focus();
+            });
+        } else console.warn('setupEventListeners: agentBtn not found');
 
-        this.fileUploadBtn.addEventListener('click', () => this.fileInput.click());
+        if (this.appsBtn) {
+            this.appsBtn.addEventListener('click', () => {
+                this.setMode('apps');
+                this.hideResults();
+                if (this.searchInput) this.searchInput.focus();
+            });
+        } else console.warn('setupEventListeners: appsBtn not found');
+
+        if (this.fileUploadBtn) {
+            this.fileUploadBtn.addEventListener('click', () => {
+                if (this.fileInput) this.fileInput.click();
+            });
+        } else console.warn('setupEventListeners: fileUploadBtn not found');
+
         // Use a single handler for file/folder uploads (supports multiple files via webkitdirectory)
-        this.fileInput.addEventListener('change', this.handleFileUpload.bind(this));
+        if (this.fileInput) {
+            this.fileInput.addEventListener('change', this.handleFileUpload.bind(this));
+        } else console.warn('setupEventListeners: fileInput not found');
 
         // this.searchBtn.addEventListener('click', () => this.handleSearch());
-        this.settingsBtn.addEventListener('click', () => {
-            this.hideResults();
-            this.searchInput.focus();
-        });
+        if (this.settingsBtn) {
+            this.settingsBtn.addEventListener('click', () => {
+                this.hideResults();
+                if (this.searchInput) this.searchInput.focus();
+            });
+        } else console.warn('setupEventListeners: settingsBtn not found');
 
-        this.captureContextBtn.addEventListener('click', () => this.captureContext());
-        this.clearContextBtn.addEventListener('click', () => this.clearContext());
-        this.closeBtn.addEventListener('click', () => this.hideResults());
-        this.copyBtn.addEventListener('click', () => this.copyToClipboard());
+        if (this.captureContextBtn) {
+            this.captureContextBtn.addEventListener('click', () => this.captureContext());
+        } else console.warn('setupEventListeners: captureContextBtn not found');
+
+        if (this.clearContextBtn) {
+            this.clearContextBtn.addEventListener('click', () => this.clearContext());
+        } else console.warn('setupEventListeners: clearContextBtn not found');
+
+        if (this.closeBtn) {
+            this.closeBtn.addEventListener('click', () => this.hideResults());
+        } else console.warn('setupEventListeners: closeBtn not found');
+
+        if (this.copyBtn) {
+            this.copyBtn.addEventListener('click', () => this.copyToClipboard());
+        } else console.warn('setupEventListeners: copyBtn not found');
         const resizeObserver = new ResizeObserver(() => this.updateWindowSize());
         resizeObserver.observe(document.body);
         // input handling
@@ -430,15 +460,14 @@ class FloatingAssistantUI {
             html += `<li><strong>Screen Text (OCR):</strong> ${context.ocrText.substring(0, 200)}...</li>`;
         }
         html += '</ul>';
-        
-        this.contextContent.innerHTML = html;
-        this.contextContainer.classList.remove('hidden');
+        if (this.contextContent) this.contextContent.innerHTML = html;
+        if (this.contextContainer && this.contextContainer.classList) this.contextContainer.classList.remove('hidden');
         this.updateWindowSize();
     }
 
     clearContext() {
         this.currentContext = null;
-        this.contextContainer.classList.add('hidden');
+        if (this.contextContainer && this.contextContainer.classList) this.contextContainer.classList.add('hidden');
         if (window.electronAPI) {
             window.electronAPI.clearContext().then(() => this.updateContextIndicator()).catch(() => this.updateContextIndicator());
         }

@@ -6,6 +6,7 @@ const { ConversationSummaryBufferMemory } = require("@langchain/classic/memory")
 const { chromeTools } = require('../agent/tools');
 const { ToolNode } =  require("@langchain/langgraph/prebuilt");
 const { StateGraph, END, START, MessagesAnnotation } = require("@langchain/langgraph");
+const { HumanMessage } =  require("@langchain/core/messages");
 
 const axios = require('axios');
 
@@ -84,7 +85,7 @@ class LLMService {
 
             this.toolNode = new ToolNode(chromeTools);
             this.workflow = new StateGraph(MessagesAnnotation)
-            .addNode("agent", this.callModel)
+            .addNode("agent", this.callModel.bind(this))
             .addNode("tools", this.toolNode)
             .addEdge(START, "agent")
             .addConditionalEdges("agent", (state) => this.shouldContinue(state))
@@ -105,16 +106,6 @@ class LLMService {
         return END;
     }
 
-    // async callModel(state) {
-    //     const messages = state.messages;
-    //      try {
-    //         const response = await this.modelWithTools.invoke(messages);
-    //         return { messages: [response] };
-    //     } catch (err) {
-    //         console.error("Tool error:", err);
-    //         return { messages: [{ role: "system", content: "Tool execution failed." }] };
-    //     }
-    // }
     async callModel(state) {
         const messages = state.messages;
         try {
@@ -156,7 +147,7 @@ class LLMService {
             // Combine old messages + new one
             const messages = [...history, newMessage];
 
-            console.log("🧠 Invoking Agent Workflow...");
+            console.log(" Invoking Agent Workflow...");
             const result = await this.agent.invoke({ messages });
 
             // Extract last message (agent reply)
@@ -169,7 +160,7 @@ class LLMService {
             // Save this exchange to memory for continuity
             await this.memory.saveContext({ input: query }, { output: content });
 
-            console.log("🤖 Agent Response:", content);
+            console.log("Agent Response:", content);
 
             return content;
         } catch (err) {
@@ -205,7 +196,7 @@ class LLMService {
             return this.getFallbackResponse(query);
         }
     }
-    
+
 
     async generateProductivityInsights(reportData, userQuery) {
         try {
@@ -367,7 +358,8 @@ class LLMService {
     switchProvider(provider) {
         if (this.providers[provider]) {
             this.currentProvider = provider;
-            this.initializeLangChain(); // reinit everything
+            this.initializeLangChain();
+            this.agent = this.workflow.compile();  // ✅ Recompile with new model
             console.log(`Switched to LLM provider: ${provider}`);
             return true;
         }
