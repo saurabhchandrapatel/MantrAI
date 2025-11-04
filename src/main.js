@@ -348,8 +348,6 @@ app.whenReady().then(async () => {
 
 // Quit when all windows are closed
 
-
-
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
@@ -365,3 +363,4 @@ app.on('before-quit', () => {
   globalShortcut.unregisterAll();
   if (tray) tray.destroy();
 });
+ 

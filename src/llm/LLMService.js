@@ -1,13 +1,7 @@
 const { ChatOpenAI } = require('@langchain/openai');
-const { ChatPromptTemplate, MessagesPlaceholder } = require('@langchain/core/prompts');
-const { InMemoryChatMessageHistory } = require('@langchain/core/chat_history');
-const { RunnableSequence } = require('@langchain/core/runnables');
 const { ConversationSummaryBufferMemory } = require("@langchain/classic/memory");
-const { chromeTools } = require('../agent/tools');
-const { ToolNode } =  require("@langchain/langgraph/prebuilt");
-const { StateGraph, END, START, MessagesAnnotation } = require("@langchain/langgraph");
+const { END } = require("@langchain/langgraph");
 const { HumanMessage } =  require("@langchain/core/messages");
-
 const axios = require('axios');
 
 class LLMService {
@@ -28,7 +22,15 @@ class LLMService {
         this.maxRetries = 3;
         this.llm = null;
         this.chain = null;
-        this.memory = null;
+        // 🔹 Initialize Memory
+        this.memory = new ConversationSummaryBufferMemory({
+        memoryKey: "chat_history",
+        llm: this.llm,
+        returnMessages: true,
+        inputKey: "input",
+        outputKey: "output",
+        maxTokenLimit: 2000,
+        });
         this.modelWithTools = null
         
         // Initialize asynchronously
@@ -52,16 +54,39 @@ class LLMService {
                 maxTokens: 500
             });
 
-            this.modelWithTools = this.llm.bindTools(chromeTools);
+            // this.modelWithTools = this.llm.bindTools(chromeTools);
+            // ✅ Load all tools dynamically (from registry)
+            let toolsToBind = [];
+            try {
+                const { toolRegistry } = require('../agent/toolRegistry');
+                toolsToBind = toolRegistry?.getAll?.() || [];
+                console.log(`[LLMService] Binding ${toolsToBind.length} tools`);
+            } catch (err) {
+                console.warn("[LLMService] ⚠️ Tool registry not found, continuing without tools.");
+            }
 
+            // ✅ Bind tools safely (prevents .map crash)
+            if (Array.isArray(toolsToBind) && toolsToBind.length > 0) {
+                this.modelWithTools = this.llm.bindTools(toolsToBind);
+            } else {
+                console.warn("[LLMService] No tools bound — running in plain LLM mode");
+                this.modelWithTools = this.llm;
+            }
+
+            
+            // ✅ Initialize memory
             this.memory = new ConversationSummaryBufferMemory({
-                llm: this.llm,               // optional but recommended for summarization
-                memoryKey: "history",        // where messages are stored
-                inputKey: "input",           // which field in your chain input is the user text
+                llm: this.llm,
+                memoryKey: "history",
+                inputKey: "input",
                 returnMessages: true,
-                maxTokenLimit: 1000          // optional, defaults to ~500–1000
+                maxTokenLimit: 1000
             });
 
+            // ✅ Build prompt and chain
+            const { ChatPromptTemplate, MessagesPlaceholder } = require('@langchain/core/prompts');
+            const { RunnableSequence } = require('@langchain/core/runnables');
+            
             const prompt = ChatPromptTemplate.fromMessages([
                 ['system', 'You are a helpful AI assistant integrated into a desktop productivity app. Provide concise, practical advice.'],
                 new MessagesPlaceholder('history'),
@@ -75,7 +100,6 @@ class LLMService {
                 },
                 prompt,
                 this.llm,
-                // ✅ Preserve both input + output
                 async (output, input) => {
                     const userInput = input?.input ?? "unknown input";
                     await this.memory.saveContext({ input: userInput }, { output: output.content });
@@ -83,15 +107,23 @@ class LLMService {
                 }
             ]);
 
-            this.toolNode = new ToolNode(chromeTools);
-            this.workflow = new StateGraph(MessagesAnnotation)
+            // ✅ LangGraph workflow setup
+            const { ToolNode } = require("@langchain/langgraph/prebuilt");
+            const { StateGraph, END, START, MessagesAnnotation } = require("@langchain/langgraph");
+
+
+            this.toolNode = new ToolNode(toolsToBind);
+        this.workflow = new StateGraph(MessagesAnnotation)
             .addNode("agent", this.callModel.bind(this))
-            .addNode("tools", this.toolNode)
-            .addEdge(START, "agent")
-            .addConditionalEdges("agent", (state) => this.shouldContinue(state))
-            .addEdge("tools", "agent");
-            this.agent = this.workflow.compile()
+                .addNode("tools", this.toolNode)
+                .addEdge(START, "agent")
+                .addConditionalEdges("agent", (state) => this.shouldContinue(state))
+                .addEdge("tools", "agent");
+
+            this.agent = this.workflow.compile();
             // await this.agent.invoke({ messages: [{ role: "user", content: "Hi!" }] });
+            console.log("[LLMService] ✅ LangChain initialized with tools");
+
 
         }
     }

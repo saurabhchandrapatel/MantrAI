@@ -1,0 +1,23 @@
+{
+  "notepad": {
+    "open": "notepad.exe",
+    "commands": {
+      "save_as": ["Ctrl", "S"]
+    }
+  },
+  "mspaint": {
+    "open": "mspaint.exe",
+    "commands": {
+      "save_as": ["Ctrl", "S"]
+    }
+  },
+  "code": {
+    "open": "code",
+    "commands": {
+      "save_as": ["Ctrl", "Shift", "S"]
+    }
+  },
+  "explorer": {
+    "open": "explorer.exe"
+  }
+}
