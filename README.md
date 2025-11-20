@@ -1,4 +1,4 @@
-# MantrAI Assistant with Productivity Tracker
+# MantrAI Assistant
 
 A Windows desktop application built with Electron that provides a floating AI assistant interface and automatic productivity tracking.
 
