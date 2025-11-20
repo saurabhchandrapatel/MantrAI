@@ -1,6 +1,6 @@
-const { ipcRenderer } = require('electron');
+// const { ipcRenderer } = require('electron'); // Removed for security
 
-document.getElementById('dateRange').addEventListener('change', function() {
+document.getElementById('dateRange').addEventListener('change', function () {
     updateReport(this.value);
 });
 
@@ -16,7 +16,7 @@ function secondsToHuman(seconds) {
 
 async function fetchReport(period) {
     try {
-        const resp = await ipcRenderer.invoke('generate-report', period);
+        const resp = await window.electronAPI.generateReport(period);
         if (!resp || !resp.success) return { error: resp ? resp.error : 'No response' };
         return resp.report;
     } catch (err) {
@@ -40,12 +40,12 @@ async function updateReport(period) {
         document.getElementById('idleTime').textContent = 'Pending';
 
         document.getElementById('appList').innerHTML = '<li class="app-item">No data available</li>';
-        document.querySelector('.insights').innerHTML = `<strong>AI Analysis:</strong> Pending`; 
+        document.querySelector('.insights').innerHTML = `<strong>AI Analysis:</strong> Pending`;
         return;
     }
 
     // Compute totals from rawData if available
-    let totalSeconds = null; 
+    let totalSeconds = null;
     let productiveSeconds = null;
     let distractingSeconds = null;
 

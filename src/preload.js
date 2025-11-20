@@ -15,26 +15,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setFileContext: (filename, content) => ipcRenderer.invoke('set-file-context', { filename, content }),
   // Accept structured payloads for bulk folder uploads: { files: [ { name, content, isBinary } ] }
   setFileContextBulk: (payload) => ipcRenderer.invoke('set-file-context', payload),
-  
+
   // Context management
   addContext: (context) => ipcRenderer.invoke('add-context', context),
   clearContext: () => ipcRenderer.invoke('clear-context'),
   getConversationHistory: () => ipcRenderer.invoke('get-conversation-history'),
-  
+
   // Event listeners
   onWindowShown: (callback) => ipcRenderer.on('window-shown', callback),
   onWindowHidden: (callback) => ipcRenderer.on('window-hidden', callback),
   onShowReport: (callback) => ipcRenderer.on('show-report', callback),
   onFocusModeStarted: (callback) => ipcRenderer.on('focus-mode-started', callback),
-  
+
   // Remove listeners
-  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
+  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
+
+  // Settings & Reports
+  saveSettings: (settings) => ipcRenderer.invoke('save-all-settings', settings),
+  getAllSettings: () => ipcRenderer.invoke('get-all-settings'),
+  testLLMConnection: () => ipcRenderer.invoke('test-llm-connection'),
+  exportUserData: () => ipcRenderer.invoke('export-user-data'),
+  clearUserData: () => ipcRenderer.invoke('clear-user-data'),
+  generateReport: (period) => ipcRenderer.invoke('generate-report', period),
+
+  // Automation Tools
+  invokeTool: (toolName, args) => ipcRenderer.invoke(`tool:${toolName}`, args)
 });
 
 
 contextBridge.exposeInMainWorld('system', {
-    getInstalledApps: () => ipcRenderer.invoke('get-installed-apps'),
-    launchApp: (appPath) => ipcRenderer.invoke('launch-app', appPath)
+  getInstalledApps: () => ipcRenderer.invoke('get-installed-apps'),
+  launchApp: (appPath) => ipcRenderer.invoke('launch-app', appPath)
 });
 
 // Event bridge for installed-apps updates (background icon enrichment)

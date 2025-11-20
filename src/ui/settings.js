@@ -1,16 +1,16 @@
-const { ipcRenderer } = require('electron');
+// const { ipcRenderer } = require('electron'); // Removed for security
 
 // Tab switching
 function switchTab(tabName) {
     document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-    
+
     event.target.classList.add('active');
     document.getElementById(tabName + '-tab').classList.add('active');
 }
 
 // Provider switching
-document.getElementById('provider').addEventListener('change', function() {
+document.getElementById('provider').addEventListener('change', function () {
     const provider = this.value;
     document.querySelectorAll('.provider-config').forEach(el => el.classList.remove('active'));
     document.getElementById(provider + '-config').classList.add('active');
@@ -18,7 +18,7 @@ document.getElementById('provider').addEventListener('change', function() {
 
 // Toggle switches
 document.querySelectorAll('.switch').forEach(toggle => {
-    toggle.addEventListener('click', function() {
+    toggle.addEventListener('click', function () {
         this.classList.toggle('active');
     });
 });
@@ -59,12 +59,12 @@ async function saveSettings() {
         settings.apiKey = document.getElementById('proxy-key').value;
     }
 
-    await ipcRenderer.invoke('save-all-settings', settings);
+    await window.electronAPI.saveSettings(settings);
     alert('✅ Settings saved successfully!');
 }
 
 async function testConnection() {
-    const result = await ipcRenderer.invoke('test-llm-connection');
+    const result = await window.electronAPI.testLLMConnection();
     alert(result.success ? '✅ Connection successful!' : '❌ Connection failed: ' + result.error);
 }
 
@@ -75,26 +75,26 @@ function resetDefaults() {
 }
 
 function exportData() {
-    ipcRenderer.invoke('export-user-data').then(result => {
+    window.electronAPI.exportUserData().then(result => {
         alert(result.success ? '✅ Data exported successfully!' : '❌ Export failed: ' + result.error);
     });
 }
 
 function clearData() {
     if (confirm('Clear all tracking data? This cannot be undone.')) {
-        ipcRenderer.invoke('clear-user-data').then(result => {
+        window.electronAPI.clearUserData().then(result => {
             alert(result.success ? '✅ Data cleared successfully!' : '❌ Clear failed: ' + result.error);
         });
     }
 }
 
 // Load current settings
-ipcRenderer.invoke('get-all-settings').then(settings => {
+window.electronAPI.getAllSettings().then(settings => {
     if (settings) {
         // AI settings
         document.getElementById('provider').value = settings.provider || 'openai';
         document.getElementById('provider').dispatchEvent(new Event('change'));
-        
+
         if (settings.provider === 'openai') {
             document.getElementById('openai-key').value = settings.apiKey || '';
             document.getElementById('openai-model').value = settings.model || 'gpt-3.5-turbo';
@@ -105,7 +105,7 @@ ipcRenderer.invoke('get-all-settings').then(settings => {
             document.getElementById('proxy-url').value = settings.url || '';
             document.getElementById('proxy-key').value = settings.apiKey || '';
         }
-        
+
         // Tracking settings
         if (settings.tracking) {
             if (!settings.tracking.enabled) document.getElementById('trackingEnabled').classList.remove('active');
@@ -114,7 +114,7 @@ ipcRenderer.invoke('get-all-settings').then(settings => {
             document.getElementById('productiveApps').value = (settings.tracking.productiveApps || []).join(', ');
             document.getElementById('distractingApps').value = (settings.tracking.distractingApps || []).join(', ');
         }
-        
+
         // Notification settings
         if (settings.notifications) {
             if (!settings.notifications.dailyReports) document.getElementById('dailyReports').classList.remove('active');
@@ -123,7 +123,7 @@ ipcRenderer.invoke('get-all-settings').then(settings => {
             document.getElementById('reportTime').value = settings.notifications.reportTime || '18:00';
             document.getElementById('breakInterval').value = settings.notifications.breakInterval || 60;
         }
-        
+
         // Privacy settings
         if (settings.privacy) {
             if (settings.privacy.shareAnalytics) document.getElementById('shareAnalytics').classList.add('active');

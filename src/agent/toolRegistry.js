@@ -16,11 +16,14 @@ class ToolRegistry {
             const channel = `tool:${name}`;
             if (!this.registeredHandlers.has(channel)) {
                 ipcMain.handle(channel, async (event, args) => {
+                    const startTime = Date.now();
+                    console.log(`[${new Date().toISOString()}] [START] ${name}`, JSON.stringify(args));
                     try {
                         const result = await handler(args);
+                        console.log(`[${new Date().toISOString()}] [END] ${name} (${Date.now() - startTime}ms)`);
                         return { success: true, result };
                     } catch (err) {
-                        console.error(`[${channel}] Error:`, err);
+                        console.error(`[${new Date().toISOString()}] [ERROR] ${name}:`, err);
                         return { success: false, error: err.message || String(err) };
                     }
                 });
@@ -59,7 +62,7 @@ class ToolRegistry {
     listTools() {
         return Array.from(this.tools.values());
     }
-    
+
     getAll() {
         return Array.from(this.tools.values());
     }
@@ -121,5 +124,5 @@ registry.discoverToolsFrom(toolsDir);
 module.exports = {
     registry,
     tools: registry.listTools(),
-    
+
 };

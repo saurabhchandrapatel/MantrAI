@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, Tray, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, Tray, Menu, nativeImage, shell, dialog } = require('electron');
 const path = require('path');
 const LLMService = require('./llm/LLMService');
 const { getScreenContext, formatContextForLLM } = require('./utils/screenContext');
@@ -14,6 +14,7 @@ require('dotenv').config();
 
 const llmService = new LLMService();
 const activityTracker = new ActivityTracker();
+const reportGenerator = new ReportGenerator();
 
 let mainWindow;
 let settingsWindow;
@@ -41,10 +42,10 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'ui', 'index.html'));
-  
+
   // Open DevTools for debugging
   mainWindow.webContents.openDevTools();
-  
+
 
   // Center window
   const { screen } = require('electron');
@@ -70,8 +71,8 @@ function createWindow() {
 function createTray() {
   const iconPath = path.join(__dirname, 'assets', 'tray-icon.png');
   tray = new Tray(iconPath);
-  
-  
+
+
   const contextMenu = Menu.buildFromTemplate([
     {
       label: 'Show Assistant',
@@ -89,8 +90,9 @@ function createTray() {
             width: 900,
             height: 700,
             webPreferences: {
-              nodeIntegration: true,
-              contextIsolation: false
+              nodeIntegration: false,
+              contextIsolation: true,
+              preload: path.join(__dirname, 'preload.js')
             }
           });
           reportWindow.loadFile(path.join(__dirname, 'ui', 'report.html'));
@@ -107,8 +109,9 @@ function createTray() {
             width: 900,
             height: 700,
             webPreferences: {
-              nodeIntegration: true,
-              contextIsolation: false
+              nodeIntegration: false,
+              contextIsolation: true,
+              preload: path.join(__dirname, 'preload.js')
             }
           });
           settingsWindow.loadFile(path.join(__dirname, 'ui', 'settings.html'));
@@ -123,7 +126,7 @@ function createTray() {
       click: () => app.quit()
     }
   ]);
-  
+
   tray.setContextMenu(contextMenu);
   tray.setToolTip('Floating AI Assistant');
 
@@ -147,7 +150,7 @@ function setupShortcuts() {
     }
   });
 }
- 
+
 function validateIconPath(iconPath) {
   if (!iconPath) return null;
 
@@ -215,8 +218,9 @@ app.whenReady().then(async () => {
           width: 900,
           height: 700,
           webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js')
           }
         });
         settingsWindow.loadFile(path.join(__dirname, 'ui', 'settings.html'));
@@ -290,15 +294,15 @@ app.whenReady().then(async () => {
     if (mainWindow) {
       const width = mainWindow.getSize()[0];
       // add padding/margin buffer (e.g., +50)
-      mainWindow.setSize(width, Math.min(newHeight + 50, 800)); 
+      mainWindow.setSize(width, Math.min(newHeight + 50, 800));
     }
   });
 
-   // Replace the get-installed-apps handler
+  // Replace the get-installed-apps handler
   ipcMain.handle('get-installed-apps', async () => {
     try {
-        const apps = await getInstalledApps();
-        const normalized = apps
+      const apps = await getInstalledApps();
+      const normalized = apps
         .map(app => {
 
           const validIcon = validateIconPath(app.DisplayIcon);
@@ -311,40 +315,125 @@ app.whenReady().then(async () => {
         })
         .filter(app => app.Name && app.AppID);
 
-        console.log('Found apps:', normalized.length);
-        return normalized;
+      console.log('Found apps:', normalized.length);
+      return normalized;
     } catch (err) {
-        console.error('Error getting installed apps:', err);
-        return [];
+      console.error('Error getting installed apps:', err);
+      return [];
     }
-}); 
+  });
 
   // Replace the existing launch-app handler with this improved version:
-   // Update the launch-app handler to work with the new format
+  // Update the launch-app handler to work with the new format
   ipcMain.handle('launch-app', async (_, app) => {
-      try {
-          if (!app.AppID) {
-              throw new Error('No app path provided');
-          }
-
-          // Handle different path formats
-          if (app.AppID.endsWith('.exe') || app.AppID.endsWith('.app')) {
-              await execAsync(`start "" "${app.AppID}"`);
-              console.log(`Launched via direct path: ${app.AppID}`);
-              return true;
-          }
-
-          // Try launching via Start-Process as fallback
-          await execAsync(`powershell -NoProfile -Command "Start-Process '${app.Name.replace("'", "''")}'"`);
-          console.log(`Launched via Start-Process: ${app.Name}`);
-          return true;
-      } catch (err) {
-          console.error('launch-app error:', err);
-          return false;
+    try {
+      if (!app.AppID) {
+        throw new Error('No app path provided');
       }
+
+      console.log(`Launching app via shell: ${app.AppID}`);
+      // Securely open the path using Electron's shell API
+      const result = await shell.openPath(app.AppID);
+
+      if (result) {
+        console.error('Failed to launch app:', result);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('launch-app error:', err);
+      return false;
+    }
   });
 
 });
+
+// Settings Handlers
+ipcMain.handle('save-all-settings', async (event, settings) => {
+  try {
+    // Store as a single JSON blob for simplicity
+    await activityTracker.db.setSetting('user_settings', JSON.stringify(settings));
+
+    // Apply settings immediately where applicable
+    if (settings.provider) {
+      llmService.switchProvider(settings.provider);
+      if (settings.provider === 'openai' && settings.apiKey) {
+        llmService.setApiKey('openai', settings.apiKey);
+      }
+    }
+    return { success: true };
+  } catch (err) {
+    console.error('save-all-settings error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('get-all-settings', async () => {
+  try {
+    const settingsJson = await activityTracker.db.getSetting('user_settings');
+    return settingsJson ? JSON.parse(settingsJson) : null;
+  } catch (err) {
+    console.error('get-all-settings error:', err);
+    return null;
+  }
+});
+
+ipcMain.handle('test-llm-connection', async () => {
+  return await llmService.testConnection();
+});
+
+// Data Management Handlers
+ipcMain.handle('export-user-data', async () => {
+  try {
+    const { filePath } = await dialog.showSaveDialog({
+      title: 'Export Data',
+      defaultPath: 'activity_data.json',
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    });
+
+    if (filePath) {
+      // Export logic: fetch all data and write to JSON
+      // Since we don't have a direct export method, we'll fetch today's data as a sample or all data if possible.
+      // For now, let's just export the raw DB file content or a dump.
+      // Better: Use the report generator to get a full dump if supported, or just copy the DB file.
+      // Let's copy the DB file for now as it's most complete.
+      const dbPath = path.join(__dirname, 'data', 'activity.db');
+      fsSync.copyFileSync(dbPath, filePath); // Using fsSync from existing require
+      return { success: true };
+    }
+    return { success: false, error: 'Cancelled' };
+  } catch (err) {
+    console.error('export-user-data error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('clear-user-data', async () => {
+  try {
+    // Execute DELETE on activities table
+    if (activityTracker.db && activityTracker.db.db) {
+      activityTracker.db.db.prepare('DELETE FROM activities').run();
+      return { success: true };
+    }
+    return { success: false, error: 'Database not accessible' };
+  } catch (err) {
+    console.error('clear-user-data error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Report Handler
+ipcMain.handle('generate-report', async (event, period) => {
+  try {
+    const report = await reportGenerator.generateReport(period);
+    return { success: true, report };
+  } catch (err) {
+    console.error('generate-report error:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+
 
 // Quit when all windows are closed
 
@@ -363,4 +452,3 @@ app.on('before-quit', () => {
   globalShortcut.unregisterAll();
   if (tray) tray.destroy();
 });
- 
