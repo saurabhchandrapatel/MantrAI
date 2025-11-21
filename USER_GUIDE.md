@@ -11,14 +11,14 @@
 
 | Shortcut | Action |
 |----------|--------|
-| `Alt + Space` | Show/hide floating assistant |
+| `Alt + Space` | Show/hide MantraAI assistant |
 | `Ctrl + Alt + R` | Show productivity report |
 | `Enter` | Submit query |
 | `Escape` | Hide window |
 
 ## Core Features
 
-### 🎯 Floating Interface
+### 🎯 MantraAI Interface
 - Transparent overlay appears at screen center
 - Auto-hides when you click elsewhere
 - Resizes based on content

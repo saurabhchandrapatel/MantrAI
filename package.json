@@ -1,7 +1,7 @@
 {
   "name": "MantrAI",
   "version": "1.0.0",
-  "description": "Floating AI Assistant with Productivity Tracker",
+  "description": "Mantra AI Assistant with Productivity Tracker",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",

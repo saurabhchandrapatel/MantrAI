@@ -44,7 +44,7 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, 'ui', 'index.html'));
 
   // Open DevTools for debugging
-  mainWindow.webContents.openDevTools();
+  //mainWindow.webContents.openDevTools();
 
 
   // Center window
@@ -128,7 +128,7 @@ function createTray() {
   ]);
 
   tray.setContextMenu(contextMenu);
-  tray.setToolTip('Floating AI Assistant');
+  tray.setToolTip('MantraAI Assistant');
 
   tray.on('click', () => {
     if (isVisible) mainWindow.hide();
@@ -500,8 +500,6 @@ ipcMain.handle('generate-report', async (event, period) => {
     return { success: false, error: err.message };
   }
 });
-
-
 
 // Quit when all windows are closed
 

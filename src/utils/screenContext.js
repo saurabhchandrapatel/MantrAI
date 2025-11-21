@@ -15,7 +15,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const TEMP_DIR = path.join(os.tmpdir(), 'floating-ai');
+const TEMP_DIR = path.join(os.tmpdir(), 'mantra-ai');
 if (!fs.existsSync(TEMP_DIR)) fs.mkdirSync(TEMP_DIR, { recursive: true });
 
 /**

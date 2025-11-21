@@ -1,6 +1,6 @@
 # MantrAI Assistant
 
-A Windows desktop application built with Electron that provides a floating AI assistant interface and automatic productivity tracking.
+A Windows desktop application built with Electron that provides a Mantra AI assistant interface and automatic productivity tracking.
 
 ## Features
 
@@ -40,7 +40,7 @@ npm start
 ```
 
 ### Keyboard Shortcuts
-- `Alt + Space`: Show/hide floating assistant
+- `Alt + Space`: Show/hide MantraAI assistant
 - `Ctrl + Alt + R`: Show productivity report
 - `Escape`: Hide window when focused
 

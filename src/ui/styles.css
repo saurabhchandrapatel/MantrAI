@@ -21,6 +21,7 @@ body {
   min-height: 100vh;
 }
 
+
 #app {
   width: 100vw;
   min-height: 100vh;
@@ -64,7 +65,7 @@ body {
   border-radius: 6px;
   padding: 4px;
   margin-top: 10px;
-  /* border: 1px solid #404040; */
+  border: 1px solid #404040;
 }
 
 #search-input {

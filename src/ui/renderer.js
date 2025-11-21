@@ -1,7 +1,7 @@
 
-class FloatingAssistantUI {
+class MantraAIAssistantUI {
     constructor() {
-        console.log('FloatingAssistantUI constructor called');
+        console.log('MantraAI constructor called');
 
         this.searchInput = document.getElementById('search-input');
         this.searchBtn = document.getElementById('search-btn');
@@ -218,6 +218,7 @@ class FloatingAssistantUI {
                 }
             }
             else if (this.mode === 'agent') {
+                this.searchInput.value = ''; // Clear input
                 // 🚀 Enhanced agentic processing
                 try {
                     if (this.showLoading) this.showLoading();
@@ -238,6 +239,7 @@ class FloatingAssistantUI {
 
             }
             else if (this.mode === 'apps') {
+                this.searchInput.value = ''; // Clear input
                 // if exact match, launch first result
                 const matches = this.filterApps(query);
                 if (matches.length > 0) {
@@ -1061,7 +1063,7 @@ class FloatingAssistantUI {
 // Initialize the UI when DOM is loaded
 // Initialize the UI when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    const ui = new FloatingAssistantUI();
+    const ui = new MantraAIAssistantUI();
     // ui.init() is called in constructor
     window.ui = ui; // Expose for global access if needed (e.g. for onchange handlers)
 })
