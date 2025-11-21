@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('screenContext', {
 contextBridge.exposeInMainWorld('electronAPI', {
   processQuery: (query, context) => ipcRenderer.invoke('process-query', { query, context }),
   processAction: (query, context) => ipcRenderer.invoke('process-action', { query, context }),
-  
+
   // 🚀 NEW AGENTIC APIs
   executeWorkflow: (workflowName, params) => ipcRenderer.invoke('execute-workflow', { workflowName, params }),
   createWorkflow: (name, description, steps) => ipcRenderer.invoke('create-workflow', { name, description, steps }),
@@ -30,6 +30,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Context management
   addContext: (context) => ipcRenderer.invoke('add-context', context),
   clearContext: () => ipcRenderer.invoke('clear-context'),
+
+  // 🚀 Vector Store / RAG
+  uploadDocument: (filePath) => ipcRenderer.invoke('upload-document', filePath),
+  queryVectorStore: (query) => ipcRenderer.invoke('query-vector-store', query),
+  resetVectorStore: () => ipcRenderer.invoke('reset-vector-store'),
   getConversationHistory: () => ipcRenderer.invoke('get-conversation-history'),
 
   // Event listeners

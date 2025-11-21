@@ -237,42 +237,42 @@ app.whenReady().then(async () => {
   ipcMain.handle('process-action', async (event, { query, context }) => {
     return await llmService.executeAgenticTask(query, context);
   });
-  
+
   ipcMain.handle('execute-workflow', async (event, { workflowName, params }) => {
     return await llmService.executeWorkflow(workflowName, params || {});
   });
-  
+
   ipcMain.handle('create-workflow', async (event, { name, description, steps }) => {
     return await llmService.createWorkflow(name, description, steps);
   });
-  
+
   ipcMain.handle('get-workflows', async () => {
     return llmService.getAvailableWorkflows();
   });
-  
+
   ipcMain.handle('get-agent-state', async (event, key) => {
     return llmService.getAgentState(key);
   });
-  
+
   ipcMain.handle('update-agent-state', async (event, { key, value }) => {
     llmService.updateAgentState(key, value);
     return { success: true };
   });
-  
+
   ipcMain.handle('add-daily-goal', async (event, goal) => {
     llmService.addDailyGoal(goal);
     return { success: true };
   });
-  
+
   ipcMain.handle('complete-goal', async (event, goalId) => {
     llmService.completeGoal(goalId);
     return { success: true };
   });
-  
+
   ipcMain.handle('get-daily-goals', async () => {
     return llmService.getDailyGoals();
   });
-  
+
   ipcMain.handle('suggest-workflow', async (event, context) => {
     return llmService.suggestWorkflow(context);
   });
@@ -304,6 +304,34 @@ app.whenReady().then(async () => {
     } catch (err) {
       console.error('add-context error', err);
       return { success: false, error: err.message };
+    }
+  });
+
+  // 🚀 Vector Store IPC Handlers
+  ipcMain.handle('upload-document', async (event, filePath) => {
+    try {
+      return await llmService.addDocumentToStore(filePath);
+    } catch (err) {
+      console.error('upload-document error:', err);
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('query-vector-store', async (event, query) => {
+    try {
+      return await llmService.processQueryWithRAG(query);
+    } catch (err) {
+      console.error('query-vector-store error:', err);
+      return "Error processing RAG query.";
+    }
+  });
+
+  ipcMain.handle('reset-vector-store', async () => {
+    try {
+      return await llmService.resetVectorStore();
+    } catch (err) {
+      console.error('reset-vector-store error:', err);
+      return false;
     }
   });
 

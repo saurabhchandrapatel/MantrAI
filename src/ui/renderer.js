@@ -2,13 +2,13 @@
 class FloatingAssistantUI {
     constructor() {
         console.log('FloatingAssistantUI constructor called');
-        
+
         this.searchInput = document.getElementById('search-input');
         this.searchBtn = document.getElementById('search-btn');
         this.settingsBtn = document.getElementById('settings-btn');
         this.fileUploadBtn = document.getElementById('file-upload-btn');
         this.fileInput = document.getElementById('file-input');
-        
+
         this.currentFile = null;
         this.resultsContainer = document.getElementById('results-container');
         this.resultsContent = document.getElementById('results-content');
@@ -21,11 +21,11 @@ class FloatingAssistantUI {
         this.contextContent = document.getElementById('context-content');
         this.currentResponse = '';
         this.currentContext = null;
-        
-         
+
+
         this.suggestionsContainer = document.getElementById('suggestions');
         this.contextIndicator = document.getElementById('context-indicator');
- 
+
         this.agentBtn = document.getElementById('agent-btn');
         this.askBtn = document.getElementById('ask-btn');
         this.appsBtn = document.getElementById('apps-btn');
@@ -36,12 +36,12 @@ class FloatingAssistantUI {
         this.installedApps = [];
         this.filteredApps = [];
         this.isLaunching = false;
-        
+
         // 🚀 Agentic features
         this.workflows = [];
         this.dailyGoals = [];
         this.agentState = {};
-        
+
         this.init();
     }
 
@@ -51,7 +51,7 @@ class FloatingAssistantUI {
 
         await this.loadInstalledApps();
         console.log('installedApps count:', this.installedApps.length);
-        
+
         // 🚀 Load agentic data
         await this.loadAgenticData();
 
@@ -79,8 +79,8 @@ class FloatingAssistantUI {
 
         this.focusInput();
 
-    // Reflect current context/file state in the indicator
-    this.updateContextIndicator();
+        // Reflect current context/file state in the indicator
+        this.updateContextIndicator();
 
     }
 
@@ -135,7 +135,7 @@ class FloatingAssistantUI {
         // circle background
         ctx.fillStyle = bg;
         ctx.beginPath();
-        ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
+        ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
         ctx.fill();
         // initial
         const initial = (name || '?').trim().charAt(0).toUpperCase();
@@ -143,7 +143,7 @@ class FloatingAssistantUI {
         ctx.font = `${Math.round(size * 0.5)}px sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(initial, size/2, size/2 + 1);
+        ctx.fillText(initial, size / 2, size / 2 + 1);
         return canvas.toDataURL();
     }
 
@@ -159,7 +159,7 @@ class FloatingAssistantUI {
             const name = a.Name || a.appName || a.DisplayName || '';
             const appId = a.AppID || a.DisplayIcon || a.appIdentifier || '';
             const icon = a.Icon || a.DisplayIcon || ''; // may be path or dataURL; renderer expects dataURL or fallback
-            const iconHtml = icon ? `<img class="suggestion-icon" src="${icon}" />` : `<div class="suggestion-icon">${(name||'?').charAt(0)}</div>`;
+            const iconHtml = icon ? `<img class="suggestion-icon" src="${icon}" />` : `<div class="suggestion-icon">${(name || '?').charAt(0)}</div>`;
             return `
                 <div class="suggestion-item" data-appid="${appId}" data-name="${name}">
                     ${iconHtml}
@@ -210,25 +210,25 @@ class FloatingAssistantUI {
                 }
             }
             else if (this.mode === 'agent') {
-              // 🚀 Enhanced agentic processing
-              try {
+                // 🚀 Enhanced agentic processing
+                try {
                     if (this.showLoading) this.showLoading();
 
                     // Use enhanced agentic query processing
                     const response = await this.processAgenticQuery(query);
-                    
+
                     if (response) {
                         this.displayResults(response);
                     }
 
-              } catch (err) {
+                } catch (err) {
                     console.error('agentic processing error', err);
                     this.displayError('Failed to process agentic task. See console for details.');
-              } finally {
+                } finally {
                     if (this.hideLoading) this.hideLoading();
-              }
+                }
 
-            } 
+            }
             else if (this.mode === 'apps') {
                 // if exact match, launch first result
                 const matches = this.filterApps(query);
@@ -240,18 +240,18 @@ class FloatingAssistantUI {
 
         if (this.searchInput) {
             this.searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                submit();
-                e.preventDefault();
-            } else if (e.key === 'Escape') {
+                if (e.key === 'Enter') {
+                    submit();
+                    e.preventDefault();
+                } else if (e.key === 'Escape') {
                     this.searchInput.value = '';
-                this.showSuggestions([]);
-            }
+                    this.showSuggestions([]);
+                }
             });
         } else {
             console.warn('setupEventListeners: searchInput element not found');
         }
-       
+
 
         if (this.askBtn) {
             this.askBtn.addEventListener('click', () => {
@@ -326,7 +326,7 @@ class FloatingAssistantUI {
         });
 
 
-        
+
 
         this.searchBtn.addEventListener('click', submit);
         // Handle clicking outside suggestions
@@ -338,23 +338,23 @@ class FloatingAssistantUI {
 
         // Handle clicking on a suggestion
         if (this.suggestionsContainer) {
-           
-            this.suggestionsContainer.addEventListener('click', async (e) => {
-            const item = e.target.closest('.suggestion-item');
-            if (!item || this.isLaunching) return;
-            try {
-                this.isLaunching = true;
-                const appId = item.dataset.appid;
-                const name = item.dataset.name || '';
-                await this.launchApp({ AppID: appId, Name: name });
-                this.searchInput.value = '';
-                this.showSuggestions([]);
-            } finally {
-                setTimeout(() => { this.isLaunching = false; }, 800);
-            }
-        });
 
-    }
+            this.suggestionsContainer.addEventListener('click', async (e) => {
+                const item = e.target.closest('.suggestion-item');
+                if (!item || this.isLaunching) return;
+                try {
+                    this.isLaunching = true;
+                    const appId = item.dataset.appid;
+                    const name = item.dataset.name || '';
+                    await this.launchApp({ AppID: appId, Name: name });
+                    this.searchInput.value = '';
+                    this.showSuggestions([]);
+                } finally {
+                    setTimeout(() => { this.isLaunching = false; }, 800);
+                }
+            });
+
+        }
 
     }
 
@@ -387,16 +387,23 @@ class FloatingAssistantUI {
         if (!query) return;
 
         this.showLoading();
-        
+
         // Add file context indicator if a file is loaded
         let fullQuery = query;
         if (this.currentFile) {
             fullQuery = `[File: ${this.currentFile.name}] ${query}`;
         }
-        
+
         try {
             if (window.electronAPI) {
-                const response = await window.electronAPI.processQuery(fullQuery, this.currentFile ? this.currentFile.content : this.currentContext);
+                let response;
+                // If we have a file context loaded, try RAG first
+                if (this.currentFile && window.electronAPI.queryVectorStore) {
+                    console.log('Using RAG query for file context');
+                    response = await window.electronAPI.queryVectorStore(query);
+                } else {
+                    response = await window.electronAPI.processQuery(fullQuery, this.currentFile ? this.currentFile.content : this.currentContext);
+                }
                 this.displayResults(response);
             } else {
                 const response = this.getDemoResponse(fullQuery);
@@ -496,7 +503,7 @@ class FloatingAssistantUI {
 
     displayResults(response) {
         this.currentResponse = response;
-        
+
         if (typeof response === 'object' && response.type === 'productivity-report') {
             this.displayProductivityReport(response);
         } else {
@@ -512,7 +519,7 @@ class FloatingAssistantUI {
                 </div>
             `;
         }
-        
+
         this.showResults();
         this.updateWindowSize();
     }
@@ -549,7 +556,7 @@ class FloatingAssistantUI {
                 ` : ''}
             </div>
         `;
-        
+
         this.resultsContent.innerHTML = html;
         this.showResults();
         this.updateWindowSize();
@@ -661,6 +668,23 @@ class FloatingAssistantUI {
         if (!files.length) return;
 
         try {
+            this.showLoading();
+
+            // 🚀 RAG: Upload to Vector Store if available
+            if (window.electronAPI && window.electronAPI.uploadDocument) {
+                let uploadedCount = 0;
+                for (const file of files) {
+                    // file.path is available in Electron renderer
+                    if (file.path) {
+                        console.log(`Uploading to Vector Store: ${file.path}`);
+                        const res = await window.electronAPI.uploadDocument(file.path);
+                        if (res && res.success) uploadedCount++;
+                    }
+                }
+                console.log(`Uploaded ${uploadedCount} documents to ChromaDB`);
+            }
+
+            // Existing logic for UI feedback & fallback context
             // If multiple files (folder), prepare a bulk payload
             const readFile = (file) => new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -690,28 +714,21 @@ class FloatingAssistantUI {
             this.currentFile = { name: summaryName, filesCount: files.length };
             this.searchInput.placeholder = `Ask a question about ${summaryName}...`;
 
-            // Send structured payload to main process (bulk)
+            // Send structured payload to main process (bulk) - KEEPING THIS FOR NON-RAG CONTEXT FALLBACK
             if (window.electronAPI && typeof window.electronAPI.setFileContextBulk === 'function') {
-                const res = await window.electronAPI.setFileContextBulk({ files: filesPayload });
-                if (!res || !res.success) {
-                    console.warn('setFileContextBulk failed', res);
-                    this.displayError('Failed to attach uploaded files as context. See console for details.');
-                } else {
-                    this.updateContextIndicator();
-                }
-            } else if (window.electronAPI && typeof window.electronAPI.setFileContext === 'function') {
-                // fallback: set first file only
-                await window.electronAPI.setFileContext(filesPayload[0].name, filesPayload[0].content);
+                await window.electronAPI.setFileContextBulk({ files: filesPayload });
                 this.updateContextIndicator();
             }
 
             // Switch to agent mode so user can ask about uploaded files
             this.setMode('agent');
+            this.hideLoading();
             this.searchInput.focus();
 
         } catch (error) {
             console.error('Error handling files:', error);
             this.displayError('Failed to process uploaded files. Please try again.');
+            this.hideLoading();
         }
     }
 
@@ -764,12 +781,12 @@ class FloatingAssistantUI {
             </div>
         `;
         this.showResults();
-        
+
         setTimeout(() => this.hideResults(), 3000);
     }
-    
+
     // 🚀 NEW AGENTIC METHODS
-    
+
     async loadAgenticData() {
         try {
             if (window.electronAPI) {
@@ -782,12 +799,12 @@ class FloatingAssistantUI {
             console.error('Failed to load agentic data:', error);
         }
     }
-    
+
     async executeWorkflow(workflowName, params = {}) {
         try {
             this.showLoading();
             const result = await window.electronAPI.executeWorkflow(workflowName, params);
-            
+
             if (result.success) {
                 this.displayWorkflowResult(result);
             } else {
@@ -800,7 +817,7 @@ class FloatingAssistantUI {
             this.hideLoading();
         }
     }
-    
+
     displayWorkflowResult(result) {
         const html = `
             <div class="workflow-result">
@@ -822,12 +839,12 @@ class FloatingAssistantUI {
                 </div>
             </div>
         `;
-        
+
         this.resultsContent.innerHTML = html;
         this.showResults();
         this.updateWindowSize();
     }
-    
+
     async addDailyGoal(goalText) {
         try {
             await window.electronAPI.addDailyGoal(goalText);
@@ -838,7 +855,7 @@ class FloatingAssistantUI {
             return false;
         }
     }
-    
+
     async completeGoal(goalId) {
         try {
             await window.electronAPI.completeGoal(goalId);
@@ -849,7 +866,7 @@ class FloatingAssistantUI {
             return false;
         }
     }
-    
+
     displayDailyGoals() {
         const html = `
             <div class="daily-goals">
@@ -874,12 +891,12 @@ class FloatingAssistantUI {
                 `}
             </div>
         `;
-        
+
         this.resultsContent.innerHTML = html;
         this.showResults();
         this.updateWindowSize();
     }
-    
+
     displayAvailableWorkflows() {
         const html = `
             <div class="workflows-list">
@@ -898,39 +915,39 @@ class FloatingAssistantUI {
                 `).join('')}
             </div>
         `;
-        
+
         this.resultsContent.innerHTML = html;
         this.showResults();
         this.updateWindowSize();
     }
-    
+
     // Enhanced query processing with workflow detection
     async processAgenticQuery(query) {
         const lowerQuery = query.toLowerCase();
-        
+
         // Check for workflow commands
         if (lowerQuery.includes('start focus') || lowerQuery.includes('focus mode')) {
             return await this.executeWorkflow('focus_mode');
         }
-        
+
         if (lowerQuery.includes('coding setup') || lowerQuery.includes('dev setup')) {
             return await this.executeWorkflow('coding_setup');
         }
-        
+
         if (lowerQuery.includes('end day') || lowerQuery.includes('daily summary')) {
             return await this.executeWorkflow('end_day_routine');
         }
-        
+
         if (lowerQuery.includes('show goals') || lowerQuery.includes('daily goals')) {
             this.displayDailyGoals();
             return;
         }
-        
+
         if (lowerQuery.includes('show workflows') || lowerQuery.includes('available workflows')) {
             this.displayAvailableWorkflows();
             return;
         }
-        
+
         if (lowerQuery.startsWith('add goal:')) {
             const goalText = query.substring(9).trim();
             const success = await this.addDailyGoal(goalText);
@@ -941,7 +958,7 @@ class FloatingAssistantUI {
             }
             return;
         }
-        
+
         // Default to agent processing
         return await window.electronAPI.processAction(query);
     }

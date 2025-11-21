@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@langchain/classic": "^1.0.1",
+    "@langchain/community": "^1.0.4",
     "@langchain/core": "^1.0.2",
     "@langchain/langgraph": "^0.2.74",
     "@langchain/openai": "^1.0.0",
@@ -29,10 +30,12 @@
     "active-win": "^8.2.1",
     "axios": "^1.13.1",
     "better-sqlite3": "^12.4.1",
+    "chromadb": "^3.1.5",
     "clipboardy": "^3.0.0",
     "dotenv": "^16.0.0",
     "get-installed-apps": "^1.1.1",
     "langchain": "^1.0.2",
+    "pdf-parse": "^2.4.5",
     "say": "^0.16.0",
     "screenshot-desktop": "^1.15.3",
     "tesseract.js": "^6.0.1"
