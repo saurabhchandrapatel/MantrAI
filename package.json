@@ -1,5 +1,5 @@
 {
-  "name": "MantrAI",
+  "name": "mantrai-assistant",
   "version": "1.0.0",
   "description": "Mantra AI Assistant with Productivity Tracker",
   "main": "src/main.js",

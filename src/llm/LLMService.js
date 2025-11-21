@@ -1,12 +1,14 @@
 const { ChatOpenAI } = require('@langchain/openai');
-const { ConversationSummaryBufferMemory } = require("@langchain/classic/memory");
+const { ConversationSummaryBufferMemory, ChatMessageHistory } = require("@langchain/classic/memory");
 const { END } = require("@langchain/langgraph");
-const { HumanMessage } = require("@langchain/core/messages");
+const { HumanMessage, AIMessage, SystemMessage } = require("@langchain/core/messages");
 const axios = require('axios');
 const AgentOrchestrator = require('../agent/AgentOrchestrator');
 const StatePersistence = require('../agent/StatePersistence');
 const WorkflowEngine = require('../agent/WorkflowEngine');
 const PermissionManager = require('../agent/PermissionManager');
+const fs = require('fs');
+const path = require('path');
 
 class LLMService {
     constructor() {
@@ -27,14 +29,7 @@ class LLMService {
         this.llm = null;
         this.chain = null;
         // 🔹 Initialize Memory
-        this.memory = new ConversationSummaryBufferMemory({
-            memoryKey: "chat_history",
-            llm: this.llm,
-            returnMessages: true,
-            inputKey: "input",
-            outputKey: "output",
-            maxTokenLimit: 2000,
-        });
+        this.memory = null; // Will be initialized in initializeLangChain or loadHistory
         this.modelWithTools = null;
 
         // 🚀 Initialize Agent Components
@@ -43,6 +38,13 @@ class LLMService {
         this.permissionManager = new PermissionManager();
         this.agentOrchestrator = null;
 
+        // Persistence path
+        const dataDir = path.join(__dirname, '../../data');
+        if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+        }
+        this.historyFile = path.join(dataDir, 'ask_history.json');
+
         // Initialize asynchronously
         this._init();
     }
@@ -50,8 +52,90 @@ class LLMService {
     async _init() {
         try {
             await this.initializeLangChain();
+            await this.loadHistory(); // Load history on startup
         } catch (err) {
             console.error('Failed to initialize LangChain:', err);
+        }
+    }
+
+    async loadHistory() {
+        try {
+            if (fs.existsSync(this.historyFile)) {
+                const data = fs.readFileSync(this.historyFile, 'utf8');
+                const storedMessages = JSON.parse(data);
+
+                // Convert stored JSON to LangChain Message objects
+                const messages = storedMessages.map(msg => {
+                    if (msg.type === 'human') return new HumanMessage(msg.content);
+                    if (msg.type === 'ai') return new AIMessage(msg.content);
+                    if (msg.type === 'system') return new SystemMessage(msg.content);
+                    return new HumanMessage(msg.content); // Fallback
+                });
+
+                // Re-initialize memory with loaded messages
+                this.memory = new ConversationSummaryBufferMemory({
+                    llm: this.llm,
+                    memoryKey: "history",
+                    inputKey: "input",
+                    returnMessages: true,
+                    maxTokenLimit: 2000,
+                    chatHistory: new ChatMessageHistory(messages)
+                });
+                console.log(`[LLMService] Loaded ${messages.length} messages from history.`);
+            }
+        } catch (error) {
+            console.error('[LLMService] Error loading history:', error);
+            // Fallback to empty memory if load fails
+            this.memory = new ConversationSummaryBufferMemory({
+                llm: this.llm,
+                memoryKey: "history",
+                inputKey: "input",
+                returnMessages: true,
+                maxTokenLimit: 2000
+            });
+        }
+    }
+
+    async saveHistory() {
+        try {
+            if (this.memory) {
+                const messages = await this.memory.chatHistory.getMessages();
+                const serializedMessages = messages.map(msg => ({
+                    type: msg._getType(), // 'human', 'ai', 'system'
+                    content: msg.content
+                }));
+
+                // Keep only last 50 messages to prevent unlimited growth
+                const trimmedMessages = serializedMessages.slice(-50);
+
+                fs.writeFileSync(this.historyFile, JSON.stringify(trimmedMessages, null, 2));
+            }
+        } catch (error) {
+            console.error('[LLMService] Error saving history:', error);
+        }
+    }
+
+    async getChatHistory() {
+        if (this.memory) {
+            const messages = await this.memory.chatHistory.getMessages();
+            return messages.map(msg => ({
+                role: msg._getType() === 'human' ? 'user' : 'ai',
+                content: msg.content
+            }));
+        }
+        return [];
+    }
+
+    async clearChatHistory() {
+        this.memory = new ConversationSummaryBufferMemory({
+            llm: this.llm,
+            memoryKey: "history",
+            inputKey: "input",
+            returnMessages: true,
+            maxTokenLimit: 2000
+        });
+        if (fs.existsSync(this.historyFile)) {
+            fs.unlinkSync(this.historyFile);
         }
     }
 
@@ -98,7 +182,7 @@ class LLMService {
             const { ChatPromptTemplate, MessagesPlaceholder } = require('@langchain/core/prompts');
             const { RunnableSequence } = require('@langchain/core/runnables');
 
-            const prompt = ChatPromptTemplate.fromMessages([
+            this.prompt = ChatPromptTemplate.fromMessages([
                 ['system', 'You are a helpful AI assistant integrated into a desktop productivity app. Provide concise, practical advice.'],
                 new MessagesPlaceholder('history'),
                 ['human', '{input}']
@@ -109,7 +193,7 @@ class LLMService {
                     const vars = await this.memory.loadMemoryVariables({});
                     return { input, ...vars };
                 },
-                prompt,
+                this.prompt,
                 this.llm,
                 async (output, input) => {
                     const userInput = input?.input ?? "unknown input";
@@ -136,7 +220,7 @@ class LLMService {
             // 🚀 Initialize Agent Orchestrator
             this.agentOrchestrator = new AgentOrchestrator(this);
 
-            console.log("[LLMService] ✅ LangChain initialized with tools and agent orchestration");
+            console.log("[LLMService] LangChain initialized with tools and agent orchestration");
 
 
         }
@@ -240,6 +324,49 @@ class LLMService {
         } catch (error) {
             console.error('LLM processing error:', error);
             return this.getFallbackResponse(query);
+        }
+    }
+
+    async processQueryStream(query, context = null, onToken) {
+        try {
+            if (this.currentProvider === 'openai' && this.prompt && this.llm) {
+                const vars = await this.memory.loadMemoryVariables({});
+                let contextStr = '';
+                if (typeof context === 'string') {
+                    contextStr = `Document content:\n${context}\n\n`;
+                } else if (context && Object.keys(context).length > 0) {
+                    contextStr = `Context:\n${JSON.stringify(context, null, 2)}\n\n`;
+                }
+
+                const input = contextStr ? `${contextStr}Query: ${query}` : query;
+
+                // 🚀 FIX: Use prompt.pipe(llm) directly to avoid buffering in the full chain
+                const streamingChain = this.prompt.pipe(this.llm);
+                const stream = await streamingChain.stream({ input, ...vars });
+
+                let fullResponse = "";
+                for await (const chunk of stream) {
+                    // chunk is usually an AIMessageChunk or similar
+                    const token = chunk.content || "";
+                    fullResponse += token;
+                    if (onToken) onToken(token);
+                }
+
+                // Save to memory after streaming is complete
+                await this.memory.saveContext({ input }, { output: fullResponse });
+
+                return fullResponse;
+            } else {
+                // Fallback for non-streaming providers or strict LLM calls
+                const response = await this.processQuery(query, context);
+                if (onToken) onToken(response);
+                return response;
+            }
+        } catch (error) {
+            console.error('LLM streaming error:', error);
+            const fallback = this.getFallbackResponse(query);
+            if (onToken) onToken(fallback);
+            return fallback;
         }
     }
 

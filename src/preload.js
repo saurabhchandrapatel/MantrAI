@@ -9,6 +9,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
   processQuery: (query, context) => ipcRenderer.invoke('process-query', { query, context }),
   processAction: (query, context) => ipcRenderer.invoke('process-action', { query, context }),
 
+  // Streaming API
+  streamQuery: (query, context) => ipcRenderer.send('stream-query', { query, context }),
+  onStreamChunk: (callback) => ipcRenderer.on('stream-chunk', (event, chunk) => callback(chunk)),
+  onStreamEnd: (callback) => ipcRenderer.on('stream-end', callback),
+  onStreamError: (callback) => ipcRenderer.on('stream-error', (event, err) => callback(err)),
+  removeStreamListeners: () => {
+    ipcRenderer.removeAllListeners('stream-chunk');
+    ipcRenderer.removeAllListeners('stream-end');
+    ipcRenderer.removeAllListeners('stream-error');
+  },
+
   // 🚀 NEW AGENTIC APIs
   executeWorkflow: (workflowName, params) => ipcRenderer.invoke('execute-workflow', { workflowName, params }),
   createWorkflow: (name, description, steps) => ipcRenderer.invoke('create-workflow', { name, description, steps }),

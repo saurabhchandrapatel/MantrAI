@@ -80,7 +80,6 @@ class MantraAIAssistantUI {
         }
 
         this.focusInput();
-
         // Reflect current context/file state in the indicator
         this.updateContextIndicator();
 
@@ -186,30 +185,81 @@ class MantraAIAssistantUI {
                 this.appendMessage('user', query);
                 this.searchInput.value = ''; // Clear input
 
+                // Create a placeholder message for the AI response
                 const loadingId = this.appendMessage('ai', '...', true);
+                const messageEl = document.getElementById(loadingId);
+                let fullResponse = "";
+
+                // Helper to update the message content
+                const updateMessage = (text, isFinal = false) => {
+                    if (messageEl) {
+                        const bubble = messageEl.querySelector('.message-bubble');
+                        if (bubble) {
+                            // If it's the first chunk, clear the "..."
+                            if (fullResponse.length === 0 && text.length > 0) {
+                                bubble.innerHTML = "";
+                                messageEl.classList.remove('loading-message'); // Stop pulsing
+                            }
+
+                            if (isFinal) {
+                                bubble.innerHTML = this.parseMarkdown(fullResponse);
+                            } else {
+                                // For streaming, we might want to just append text or use a lightweight markdown parser
+                                // For now, let's just append text and parse at the end to avoid flickering
+                                // Or use a streaming markdown parser if available. 
+                                // Simple approach: just set textContent for now, or innerHTML if we trust the chunks.
+                                // Let's accumulate and set innerHTML with basic formatting if needed, 
+                                // but standard markdown parsing on every chunk can be heavy/glitchy.
+                                // Let's just append raw text for now and parse at the end.
+                                fullResponse += text;
+                                bubble.textContent = fullResponse;
+                            }
+                            this.scrollToBottom();
+                        }
+                    }
+                };
 
                 try {
-                    let response = null;
+                    // Check if streaming API is available
+                    if (window.electronAPI && window.electronAPI.streamQuery) {
 
-                    // Preferred: system API exposed by preload
-                    if (window.system && typeof window.system.processQuery === 'function') {
-                        response = await window.system.processQuery(query);
-                    }
-                    // Next: electronAPI bridge
-                    else if (window.electronAPI && typeof window.electronAPI.processQuery === 'function') {
-                        response = await window.electronAPI.processQuery(query);
-                    }
-                    // Older fallback: ipc invoke wrapper if present
-                    else if (window.api && typeof window.api.invoke === 'function') {
-                        response = await window.api.invoke('process-query', { query, context: null });
-                    }
-                    // Final fallback: demo responder
-                    else {
-                        response = this.getDemoResponse(query);
-                    }
+                        // Remove any previous listeners to be safe
+                        window.electronAPI.removeStreamListeners();
 
-                    this.removeMessage(loadingId);
-                    this.appendMessage('ai', response);
+                        window.electronAPI.onStreamChunk((chunk) => {
+                            updateMessage(chunk);
+                        });
+
+                        window.electronAPI.onStreamEnd(() => {
+                            updateMessage("", true); // Final parse
+                            window.electronAPI.removeStreamListeners();
+                        });
+
+                        window.electronAPI.onStreamError((err) => {
+                            console.error('Stream error:', err);
+                            if (fullResponse.length === 0) {
+                                updateMessage("Sorry, something went wrong.");
+                            }
+                            window.electronAPI.removeStreamListeners();
+                        });
+
+                        // Start the stream
+                        window.electronAPI.streamQuery(query);
+
+                    } else {
+                        // Fallback to non-streaming if API not available
+                        let response = null;
+                        if (window.system && typeof window.system.processQuery === 'function') {
+                            response = await window.system.processQuery(query);
+                        } else if (window.electronAPI && typeof window.electronAPI.processQuery === 'function') {
+                            response = await window.electronAPI.processQuery(query);
+                        } else {
+                            response = this.getDemoResponse(query);
+                        }
+
+                        this.removeMessage(loadingId);
+                        this.appendMessage('ai', response);
+                    }
 
                 } catch (err) {
                     console.error('process-query error', err);
@@ -1060,7 +1110,6 @@ class MantraAIAssistantUI {
     }
 }
 
-// Initialize the UI when DOM is loaded
 // Initialize the UI when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     const ui = new MantraAIAssistantUI();

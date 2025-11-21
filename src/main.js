@@ -154,8 +154,16 @@ function setupShortcuts() {
 function validateIconPath(iconPath) {
   if (!iconPath) return null;
 
+  // Remove quotes if present
+  let cleanPath = iconPath.replace(/^"|"$/g, '');
+
   // Clean ",0" suffix if present (e.g. "C:\\App\\icon.ico,0")
-  const cleanPath = iconPath.split(',')[0].trim();
+  cleanPath = cleanPath.split(',')[0].trim();
+
+  // Ignore GUIDs (Windows Installer Product IDs)
+  if (/^\{[\w-]+\}$/.test(cleanPath)) {
+    return null;
+  }
 
   // Decode URL-style encoding (e.g. "%20" → space)
   const decodedPath = decodeURIComponent(cleanPath);
@@ -164,7 +172,10 @@ function validateIconPath(iconPath) {
   if (fsSync.existsSync(decodedPath)) {
     return decodedPath;
   } else {
-    console.warn('Icon not found:', decodedPath);
+    // Only warn if it looks like a real path but is missing
+    if (decodedPath.includes(':') || decodedPath.includes('/')) {
+      console.warn('Icon not found:', decodedPath);
+    }
     return null;
   }
 }
@@ -271,9 +282,6 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('get-daily-goals', async () => {
     return llmService.getDailyGoals();
-  });
-
-  ipcMain.handle('suggest-workflow', async (event, context) => {
     return llmService.suggestWorkflow(context);
   });
   ipcMain.handle('process-query', async (event, { query, context }) => {
@@ -293,6 +301,31 @@ app.whenReady().then(async () => {
       return response;
     } catch (error) {
       return `Error: ${error.message}. Please check your OpenAI API key.`;
+    }
+  });
+
+  // Streaming Query Handler
+  ipcMain.on('stream-query', async (event, { query, context }) => {
+    try {
+      // Context resolution logic (same as process-query)
+      if (!context) {
+        if (currentFileContext && currentFileContext.content) {
+          context = currentFileContext.content;
+        } else if (currentExtraContext) {
+          context = formatContextForLLM(currentExtraContext);
+        } else {
+          const screenContext = await getScreenContext(true);
+          context = formatContextForLLM(screenContext);
+        }
+      }
+
+      await llmService.processQueryStream(query, context, (chunk) => {
+        event.sender.send('stream-chunk', chunk);
+      });
+
+      event.sender.send('stream-end');
+    } catch (error) {
+      event.sender.send('stream-error', error.message);
     }
   });
 
@@ -370,20 +403,35 @@ app.whenReady().then(async () => {
   ipcMain.handle('get-installed-apps', async () => {
     try {
       const apps = await getInstalledApps();
-      const normalized = apps
-        .map(app => {
 
-          const validIcon = validateIconPath(app.DisplayIcon);
-          return {
-            Name: app.appName || app.DisplayName || app.kMDItemDisplayName || '',
-            AppID: app.DisplayIcon || app.kMDItemFSName || app.appIdentifier || '',
-            DisplayIcon: validIcon,
-            Icon: null // We'll handle icons separately if needed
-          };
-        })
-        .filter(app => app.Name && app.AppID);
+      // Process apps in parallel to get icons
+      const processedApps = await Promise.all(apps.map(async (appItem) => {
+        const rawIconPath = appItem.DisplayIcon || appItem.kMDItemFSName || appItem.appIdentifier;
+        const validPath = validateIconPath(rawIconPath);
+        let iconDataUrl = null;
 
-      console.log('Found apps:', normalized.length);
+        if (validPath) {
+          try {
+            const nativeIcon = await app.getFileIcon(validPath);
+            iconDataUrl = nativeIcon.toDataURL();
+          } catch (e) {
+            // console.warn('Failed to get icon for:', validPath);
+          }
+        }
+
+        return {
+          Name: appItem.appName || appItem.DisplayName || appItem.kMDItemDisplayName || '',
+          AppID: rawIconPath || '',
+          DisplayIcon: validPath,
+          Icon: iconDataUrl
+        };
+      }));
+
+      const normalized = processedApps.filter(app => app.Name && app.AppID);
+
+      const withIcons = normalized.filter(a => a.Icon).length;
+      console.log(`Found apps: ${normalized.length}, with icons: ${withIcons}`);
+
       return normalized;
     } catch (err) {
       console.error('Error getting installed apps:', err);
