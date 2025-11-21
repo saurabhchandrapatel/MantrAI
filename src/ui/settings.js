@@ -24,6 +24,58 @@ document.querySelectorAll('.switch').forEach(toggle => {
 });
 
 
+let mcpServers = [];
+
+function renderMcpServers() {
+    const container = document.getElementById('mcp-list');
+    if (!container) return;
+
+    if (mcpServers.length === 0) {
+        container.innerHTML = '<p style="color: #888; font-style: italic;">No MCP servers configured.</p>';
+        return;
+    }
+
+    container.innerHTML = mcpServers.map((server, index) => `
+        <div style="background: white; padding: 15px; border-radius: 6px; border: 1px solid #e1e5e9; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <div style="font-weight: 600; color: #2c3e50;">${server.name}</div>
+                <div style="font-size: 0.9em; color: #666;">${server.url}</div>
+            </div>
+            <button class="btn btn-secondary" style="padding: 5px 10px; background: #dc3545; font-size: 0.8em;" onclick="removeMcpServer(${index})">Remove</button>
+        </div>
+    `).join('');
+}
+
+function addMcpServer() {
+    const nameInput = document.getElementById('mcp-name');
+    const urlInput = document.getElementById('mcp-url');
+    const keyInput = document.getElementById('mcp-key');
+
+    const name = nameInput.value.trim();
+    const url = urlInput.value.trim();
+    const apiKey = keyInput.value.trim();
+
+    if (!name || !url) {
+        alert('Please provide both a Name and URL for the server.');
+        return;
+    }
+
+    mcpServers.push({ name, url, apiKey });
+    renderMcpServers();
+
+    // Clear inputs
+    nameInput.value = '';
+    urlInput.value = '';
+    keyInput.value = '';
+}
+
+function removeMcpServer(index) {
+    if (confirm('Are you sure you want to remove this server?')) {
+        mcpServers.splice(index, 1);
+        renderMcpServers();
+    }
+}
+
 async function saveSettings() {
     const provider = document.getElementById('provider').value;
     const settings = {
@@ -45,7 +97,8 @@ async function saveSettings() {
         privacy: {
             shareAnalytics: document.getElementById('shareAnalytics').classList.contains('active'),
             dataRetention: parseInt(document.getElementById('dataRetention').value)
-        }
+        },
+        mcpServers: mcpServers
     };
 
     if (provider === 'openai') {
@@ -128,6 +181,12 @@ window.electronAPI.getAllSettings().then(settings => {
         if (settings.privacy) {
             if (settings.privacy.shareAnalytics) document.getElementById('shareAnalytics').classList.add('active');
             document.getElementById('dataRetention').value = settings.privacy.dataRetention || 90;
+        }
+
+        // MCP Servers
+        if (settings.mcpServers && Array.isArray(settings.mcpServers)) {
+            mcpServers = settings.mcpServers;
+            renderMcpServers();
         }
     }
 });

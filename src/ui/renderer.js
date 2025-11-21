@@ -351,8 +351,7 @@ class MantraAIAssistantUI {
         // this.searchBtn.addEventListener('click', () => this.handleSearch());
         if (this.settingsBtn) {
             this.settingsBtn.addEventListener('click', () => {
-                this.hideResults();
-                if (this.searchInput) this.searchInput.focus();
+                this.handleSettingsPage();
             });
         } else console.warn('setupEventListeners: settingsBtn not found');
 

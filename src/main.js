@@ -284,6 +284,7 @@ app.whenReady().then(async () => {
     return llmService.getDailyGoals();
     return llmService.suggestWorkflow(context);
   });
+
   ipcMain.handle('process-query', async (event, { query, context }) => {
     try {
       // Priority: explicit context passed in > file-uploaded context > extra context (screen capture) > live screen capture
