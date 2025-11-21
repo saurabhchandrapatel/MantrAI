@@ -36,6 +36,12 @@ class FloatingAssistantUI {
         this.installedApps = [];
         this.filteredApps = [];
         this.isLaunching = false;
+        
+        // 🚀 Agentic features
+        this.workflows = [];
+        this.dailyGoals = [];
+        this.agentState = {};
+        
         this.init();
     }
 
@@ -45,6 +51,9 @@ class FloatingAssistantUI {
 
         await this.loadInstalledApps();
         console.log('installedApps count:', this.installedApps.length);
+        
+        // 🚀 Load agentic data
+        await this.loadAgenticData();
 
         // Listen for progressive background updates (icons) from main process
         try {
@@ -201,35 +210,22 @@ class FloatingAssistantUI {
                 }
             }
             else if (this.mode === 'agent') {
-              // send to LLM
+              // 🚀 Enhanced agentic processing
               try {
                     if (this.showLoading) this.showLoading();
 
-                    let response = null;
-
-                     // Preferred: system API exposed by preload
-                    if (window.system && typeof window.system.processQuery === 'function') {
-                        response = await window.system.processQuery(query);
-                    }
-                    // Next: electronAPI bridge
-                    else if (window.electronAPI && typeof window.electronAPI.processAction === 'function') {
-                        response = await window.electronAPI.processAction(query);
-                    }
-                    // Older fallback: ipc invoke wrapper if present
-                    else if (window.api && typeof window.api.invoke === 'function') {
-                        response = await window.api.invoke('process-action', { query, context: null });
-                    }
-                    // Final fallback: demo responder
-                    else {
-                        response = this.getDemoResponse(query);
+                    // Use enhanced agentic query processing
+                    const response = await this.processAgenticQuery(query);
+                    
+                    if (response) {
+                        this.displayResults(response);
                     }
 
-                    this.displayResults(response);
-
-
-              }catch (err) {
-                    console.error('process-action error', err);
-                    this.displayError('Failed to contact assistant. See console for details.');
+              } catch (err) {
+                    console.error('agentic processing error', err);
+                    this.displayError('Failed to process agentic task. See console for details.');
+              } finally {
+                    if (this.hideLoading) this.hideLoading();
               }
 
             } 
@@ -770,6 +766,184 @@ class FloatingAssistantUI {
         this.showResults();
         
         setTimeout(() => this.hideResults(), 3000);
+    }
+    
+    // 🚀 NEW AGENTIC METHODS
+    
+    async loadAgenticData() {
+        try {
+            if (window.electronAPI) {
+                this.workflows = await window.electronAPI.getWorkflows() || [];
+                this.dailyGoals = await window.electronAPI.getDailyGoals() || [];
+                this.agentState = await window.electronAPI.getAgentState() || {};
+                console.log('Loaded agentic data:', { workflows: this.workflows.length, goals: this.dailyGoals.length });
+            }
+        } catch (error) {
+            console.error('Failed to load agentic data:', error);
+        }
+    }
+    
+    async executeWorkflow(workflowName, params = {}) {
+        try {
+            this.showLoading();
+            const result = await window.electronAPI.executeWorkflow(workflowName, params);
+            
+            if (result.success) {
+                this.displayWorkflowResult(result);
+            } else {
+                this.displayError(`Workflow failed: ${result.error}`);
+            }
+        } catch (error) {
+            console.error('Workflow execution failed:', error);
+            this.displayError('Failed to execute workflow');
+        } finally {
+            this.hideLoading();
+        }
+    }
+    
+    displayWorkflowResult(result) {
+        const html = `
+            <div class="workflow-result">
+                <div class="result-header">
+                    ⚙️ Workflow: ${result.workflowName}
+                </div>
+                <div class="result-summary">
+                    ✅ Completed ${result.results.filter(r => r.success).length}/${result.results.length} steps
+                    in ${Math.round(result.executionTime / 1000)}s
+                </div>
+                <div class="result-steps">
+                    ${result.results.map((step, i) => `
+                        <div class="step-result ${step.success ? 'success' : 'error'}">
+                            <span class="step-number">${step.step}</span>
+                            <span class="step-status">${step.success ? '✅' : '❌'}</span>
+                            <span class="step-text">${step.success ? step.result : step.error}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        
+        this.resultsContent.innerHTML = html;
+        this.showResults();
+        this.updateWindowSize();
+    }
+    
+    async addDailyGoal(goalText) {
+        try {
+            await window.electronAPI.addDailyGoal(goalText);
+            await this.loadAgenticData(); // Refresh
+            return true;
+        } catch (error) {
+            console.error('Failed to add goal:', error);
+            return false;
+        }
+    }
+    
+    async completeGoal(goalId) {
+        try {
+            await window.electronAPI.completeGoal(goalId);
+            await this.loadAgenticData(); // Refresh
+            return true;
+        } catch (error) {
+            console.error('Failed to complete goal:', error);
+            return false;
+        }
+    }
+    
+    displayDailyGoals() {
+        const html = `
+            <div class="daily-goals">
+                <div class="goals-header">
+                    🎯 Daily Goals
+                </div>
+                ${this.dailyGoals.length === 0 ? `
+                    <div class="no-goals">
+                        No goals set for today. Try saying "Add goal: [your goal]"
+                    </div>
+                ` : `
+                    <div class="goals-list">
+                        ${this.dailyGoals.map(goal => `
+                            <div class="goal-item ${goal.completed ? 'completed' : ''}">
+                                <input type="checkbox" ${goal.completed ? 'checked' : ''} 
+                                       onchange="ui.completeGoal(${goal.id})">
+                                <span class="goal-text">${goal.text}</span>
+                                ${goal.completed ? '<span class="goal-time">✅ ' + new Date(goal.completedAt).toLocaleTimeString() + '</span>' : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                `}
+            </div>
+        `;
+        
+        this.resultsContent.innerHTML = html;
+        this.showResults();
+        this.updateWindowSize();
+    }
+    
+    displayAvailableWorkflows() {
+        const html = `
+            <div class="workflows-list">
+                <div class="workflows-header">
+                    ⚙️ Available Workflows
+                </div>
+                ${this.workflows.map(workflow => `
+                    <div class="workflow-item" onclick="ui.executeWorkflow('${workflow.name}')">
+                        <div class="workflow-name">${workflow.name}</div>
+                        <div class="workflow-description">${workflow.description}</div>
+                        <div class="workflow-meta">
+                            ${workflow.type} • ${workflow.steps?.length || 0} steps
+                            ${workflow.useCount ? ` • Used ${workflow.useCount} times` : ''}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        
+        this.resultsContent.innerHTML = html;
+        this.showResults();
+        this.updateWindowSize();
+    }
+    
+    // Enhanced query processing with workflow detection
+    async processAgenticQuery(query) {
+        const lowerQuery = query.toLowerCase();
+        
+        // Check for workflow commands
+        if (lowerQuery.includes('start focus') || lowerQuery.includes('focus mode')) {
+            return await this.executeWorkflow('focus_mode');
+        }
+        
+        if (lowerQuery.includes('coding setup') || lowerQuery.includes('dev setup')) {
+            return await this.executeWorkflow('coding_setup');
+        }
+        
+        if (lowerQuery.includes('end day') || lowerQuery.includes('daily summary')) {
+            return await this.executeWorkflow('end_day_routine');
+        }
+        
+        if (lowerQuery.includes('show goals') || lowerQuery.includes('daily goals')) {
+            this.displayDailyGoals();
+            return;
+        }
+        
+        if (lowerQuery.includes('show workflows') || lowerQuery.includes('available workflows')) {
+            this.displayAvailableWorkflows();
+            return;
+        }
+        
+        if (lowerQuery.startsWith('add goal:')) {
+            const goalText = query.substring(9).trim();
+            const success = await this.addDailyGoal(goalText);
+            if (success) {
+                this.displayResults(`✅ Goal added: "${goalText}"`);
+            } else {
+                this.displayError('Failed to add goal');
+            }
+            return;
+        }
+        
+        // Default to agent processing
+        return await window.electronAPI.processAction(query);
     }
 }
 

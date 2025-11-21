@@ -8,6 +8,17 @@ contextBridge.exposeInMainWorld('screenContext', {
 contextBridge.exposeInMainWorld('electronAPI', {
   processQuery: (query, context) => ipcRenderer.invoke('process-query', { query, context }),
   processAction: (query, context) => ipcRenderer.invoke('process-action', { query, context }),
+  
+  // 🚀 NEW AGENTIC APIs
+  executeWorkflow: (workflowName, params) => ipcRenderer.invoke('execute-workflow', { workflowName, params }),
+  createWorkflow: (name, description, steps) => ipcRenderer.invoke('create-workflow', { name, description, steps }),
+  getWorkflows: () => ipcRenderer.invoke('get-workflows'),
+  getAgentState: (key) => ipcRenderer.invoke('get-agent-state', key),
+  updateAgentState: (key, value) => ipcRenderer.invoke('update-agent-state', { key, value }),
+  addDailyGoal: (goal) => ipcRenderer.invoke('add-daily-goal', goal),
+  completeGoal: (goalId) => ipcRenderer.invoke('complete-goal', goalId),
+  getDailyGoals: () => ipcRenderer.invoke('get-daily-goals'),
+  suggestWorkflow: (context) => ipcRenderer.invoke('suggest-workflow', context),
   getProductivityReport: (period) => ipcRenderer.invoke('get-productivity-report', period),
   hideWindow: () => ipcRenderer.send('hide-window'),
   resizeWindow: (height) => ipcRenderer.send('resize-window', height),

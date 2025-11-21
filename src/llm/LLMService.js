@@ -3,6 +3,10 @@ const { ConversationSummaryBufferMemory } = require("@langchain/classic/memory")
 const { END } = require("@langchain/langgraph");
 const { HumanMessage } =  require("@langchain/core/messages");
 const axios = require('axios');
+const AgentOrchestrator = require('../agent/AgentOrchestrator');
+const StatePersistence = require('../agent/StatePersistence');
+const WorkflowEngine = require('../agent/WorkflowEngine');
+const PermissionManager = require('../agent/PermissionManager');
 
 class LLMService {
     constructor() {
@@ -31,7 +35,13 @@ class LLMService {
         outputKey: "output",
         maxTokenLimit: 2000,
         });
-        this.modelWithTools = null
+        this.modelWithTools = null;
+        
+        // 🚀 Initialize Agent Components
+        this.statePersistence = new StatePersistence();
+        this.workflowEngine = new WorkflowEngine(this.statePersistence);
+        this.permissionManager = new PermissionManager();
+        this.agentOrchestrator = null;
         
         // Initialize asynchronously
         this._init();
@@ -122,8 +132,11 @@ class LLMService {
                 .addEdge("tools", "agent");
 
             this.agent = this.workflow.compile();
-            // await this.agent.invoke({ messages: [{ role: "user", content: "Hi!" }] });
-            console.log("[LLMService] ✅ LangChain initialized with tools");
+            
+            // 🚀 Initialize Agent Orchestrator
+            this.agentOrchestrator = new AgentOrchestrator(this);
+            
+            console.log("[LLMService] ✅ LangChain initialized with tools and agent orchestration");
 
 
         }
@@ -388,11 +401,95 @@ class LLMService {
         }
     }
 
+    // 🚀 NEW AGENTIC METHODS
+    
+    async executeAgenticTask(userInput, context = null) {
+        if (!this.agentOrchestrator) {
+            return await this.processQuery(userInput, context); // Fallback to regular processing
+        }
+        
+        try {
+            // Save conversation to state
+            this.statePersistence.saveConversation([{ role: 'user', content: userInput }]);
+            
+            // Execute through agent orchestrator
+            const result = await this.agentOrchestrator.executeTask(userInput, context);
+            
+            // Save response
+            this.statePersistence.saveConversation([{ role: 'assistant', content: result }]);
+            
+            return result;
+        } catch (error) {
+            console.error('[LLMService] Agentic task failed:', error);
+            return await this.processQuery(userInput, context); // Fallback
+        }
+    }
+    
+    async executeWorkflow(workflowName, params = {}) {
+        return await this.workflowEngine.executeWorkflow(workflowName, params);
+    }
+    
+    async createWorkflow(name, description, steps) {
+        return await this.workflowEngine.createCustomWorkflow(name, description, steps);
+    }
+    
+    getAvailableWorkflows() {
+        return this.workflowEngine.getAvailableWorkflows();
+    }
+    
+    getAgentState(key) {
+        return this.statePersistence.getState(key);
+    }
+    
+    updateAgentState(key, value) {
+        this.statePersistence.updateState(key, value);
+    }
+    
+    async requestPermission(action, details) {
+        return await this.permissionManager.requestPermission(action, details);
+    }
+    
+    // Productivity helpers
+    addDailyGoal(goal) {
+        this.statePersistence.addDailyGoal(goal);
+    }
+    
+    completeGoal(goalId) {
+        this.statePersistence.completeGoal(goalId);
+    }
+    
+    getDailyGoals() {
+        return this.statePersistence.getState('productivity')?.dailyGoals || [];
+    }
+    
+    // Smart workflow suggestions based on context
+    suggestWorkflow(context) {
+        const timeOfDay = new Date().getHours();
+        const dayOfWeek = new Date().getDay();
+        
+        if (timeOfDay >= 9 && timeOfDay <= 17 && dayOfWeek >= 1 && dayOfWeek <= 5) {
+            if (context?.activeApp?.includes('code') || context?.activeApp?.includes('dev')) {
+                return 'coding_setup';
+            }
+            if (timeOfDay === 17) {
+                return 'end_day_routine';
+            }
+        }
+        
+        return null;
+    }
+
     switchProvider(provider) {
         if (this.providers[provider]) {
             this.currentProvider = provider;
             this.initializeLangChain();
             this.agent = this.workflow.compile();  // ✅ Recompile with new model
+            
+            // Reinitialize agent orchestrator with new LLM
+            if (this.agentOrchestrator) {
+                this.agentOrchestrator = new AgentOrchestrator(this);
+            }
+            
             console.log(`Switched to LLM provider: ${provider}`);
             return true;
         }

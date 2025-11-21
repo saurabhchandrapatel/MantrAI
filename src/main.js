@@ -233,8 +233,48 @@ app.whenReady().then(async () => {
     }
   });
 
+  // 🚀 NEW AGENTIC HANDLERS
   ipcMain.handle('process-action', async (event, { query, context }) => {
-    return await llmService.processAction(query, context);
+    return await llmService.executeAgenticTask(query, context);
+  });
+  
+  ipcMain.handle('execute-workflow', async (event, { workflowName, params }) => {
+    return await llmService.executeWorkflow(workflowName, params || {});
+  });
+  
+  ipcMain.handle('create-workflow', async (event, { name, description, steps }) => {
+    return await llmService.createWorkflow(name, description, steps);
+  });
+  
+  ipcMain.handle('get-workflows', async () => {
+    return llmService.getAvailableWorkflows();
+  });
+  
+  ipcMain.handle('get-agent-state', async (event, key) => {
+    return llmService.getAgentState(key);
+  });
+  
+  ipcMain.handle('update-agent-state', async (event, { key, value }) => {
+    llmService.updateAgentState(key, value);
+    return { success: true };
+  });
+  
+  ipcMain.handle('add-daily-goal', async (event, goal) => {
+    llmService.addDailyGoal(goal);
+    return { success: true };
+  });
+  
+  ipcMain.handle('complete-goal', async (event, goalId) => {
+    llmService.completeGoal(goalId);
+    return { success: true };
+  });
+  
+  ipcMain.handle('get-daily-goals', async () => {
+    return llmService.getDailyGoals();
+  });
+  
+  ipcMain.handle('suggest-workflow', async (event, context) => {
+    return llmService.suggestWorkflow(context);
   });
   ipcMain.handle('process-query', async (event, { query, context }) => {
     try {

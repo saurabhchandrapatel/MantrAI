@@ -1,5 +1,5 @@
 {
-  "name": "floating-ai-assistant",
+  "name": "MantrAI",
   "version": "1.0.0",
   "description": "Floating AI Assistant with Productivity Tracker",
   "main": "src/main.js",
@@ -22,6 +22,7 @@
   "dependencies": {
     "@langchain/classic": "^1.0.1",
     "@langchain/core": "^1.0.2",
+    "@langchain/langgraph": "^0.2.74",
     "@langchain/openai": "^1.0.0",
     "@nut-tree-fork/nut-js": "^4.2.6",
     "about-window": "^1.15.2",
