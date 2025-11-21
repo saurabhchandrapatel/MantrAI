@@ -32,7 +32,8 @@ class FloatingAssistantUI {
         this.fileUploadBtn = document.getElementById('file-upload-btn');
         this.fileInput = document.getElementById('file-input');
 
-        this.mode = 'agent'; // 'agent' | 'apps' | 'ask' | 'file'
+        // this.mode = 'agent'; // 'agent' | 'apps' | 'ask' | 'file'
+        this.mode = 'ask';
         this.installedApps = [];
         this.filteredApps = [];
         this.isLaunching = false;
@@ -41,6 +42,7 @@ class FloatingAssistantUI {
         this.workflows = [];
         this.dailyGoals = [];
         this.agentState = {};
+        this.chatHistory = [];
 
         this.init();
     }
@@ -108,6 +110,10 @@ class FloatingAssistantUI {
         else if (newMode === 'apps') this.searchInput.placeholder = "Search installed apps...";
         else if (newMode === 'file') this.searchInput.placeholder = "Upload a file to ask questions about it...";
         this.showSuggestions([]); // clear
+
+        if (newMode === 'ask') {
+            this.renderChatHistory();
+        }
     }
 
     filterApps(query) {
@@ -177,10 +183,12 @@ class FloatingAssistantUI {
             const query = this.searchInput.value.trim();
             if (!query) return;
             if (this.mode === 'ask') {
-                // send to LLM
-                try {
-                    if (this.showLoading) this.showLoading();
+                this.appendMessage('user', query);
+                this.searchInput.value = ''; // Clear input
 
+                const loadingId = this.appendMessage('ai', '...', true);
+
+                try {
                     let response = null;
 
                     // Preferred: system API exposed by preload
@@ -200,13 +208,13 @@ class FloatingAssistantUI {
                         response = this.getDemoResponse(query);
                     }
 
-                    this.displayResults(response);
-                    if (this.hideLoading) this.hideLoading();
+                    this.removeMessage(loadingId);
+                    this.appendMessage('ai', response);
+
                 } catch (err) {
                     console.error('process-query error', err);
-                    this.displayError('Failed to contact assistant. See console for details.');
-                } finally {
-                    if (this.hideLoading) this.hideLoading();
+                    this.removeMessage(loadingId);
+                    this.appendMessage('ai', 'Sorry, something went wrong.');
                 }
             }
             else if (this.mode === 'agent') {
@@ -256,7 +264,7 @@ class FloatingAssistantUI {
         if (this.askBtn) {
             this.askBtn.addEventListener('click', () => {
                 this.setMode('ask');
-                this.hideResults();
+                // this.hideResults(); // Managed by renderChatHistory
                 if (this.searchInput) this.searchInput.focus();
             });
         } else console.warn('setupEventListeners: askBtn not found');
@@ -785,6 +793,92 @@ class FloatingAssistantUI {
         setTimeout(() => this.hideResults(), 3000);
     }
 
+    // 🚀 CHAT METHODS
+    renderChatHistory() {
+        this.resultsContent.innerHTML = '<div class="chat-container"></div>';
+        const container = this.resultsContent.querySelector('.chat-container');
+
+        if (this.chatHistory.length === 0) {
+            this.chatHistory.push({ role: 'ai', content: 'Hello! How can I help you today?' });
+        }
+
+        this.chatHistory.forEach(msg => {
+            const el = this.createMessageElement(msg.role, msg.content);
+            container.appendChild(el);
+        });
+
+        this.showResults();
+        this.scrollToBottom();
+    }
+
+    appendMessage(role, content, isLoading = false) {
+        if (!isLoading) {
+            this.chatHistory.push({ role, content });
+        }
+
+        let container = this.resultsContent.querySelector('.chat-container');
+        if (!container) {
+            this.resultsContent.innerHTML = '<div class="chat-container"></div>';
+            container = this.resultsContent.querySelector('.chat-container');
+        }
+
+        const el = this.createMessageElement(role, content);
+        if (isLoading) {
+            el.id = 'chat-loading-' + Date.now();
+            el.classList.add('loading-message');
+        }
+        container.appendChild(el);
+        this.showResults();
+        this.scrollToBottom();
+        return el.id;
+    }
+
+    removeMessage(id) {
+        if (!id) return;
+        const el = document.getElementById(id);
+        if (el) el.remove();
+    }
+
+    createMessageElement(role, content) {
+        const div = document.createElement('div');
+        div.className = `chat-message ${role}`;
+
+        const avatar = document.createElement('div');
+        avatar.className = 'message-avatar';
+        avatar.textContent = role === 'user' ? '👤' : '🤖';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+
+        if (typeof content === 'string') {
+            bubble.innerHTML = this.parseMarkdown(content);
+        } else {
+            if (content.type === 'productivity-report') {
+                bubble.innerHTML = `<strong>${content.title}</strong><br>${content.summary}`;
+            } else {
+                bubble.textContent = JSON.stringify(content);
+            }
+        }
+
+        div.appendChild(avatar);
+        div.appendChild(bubble);
+        return div;
+    }
+
+    scrollToBottom() {
+        setTimeout(() => {
+            if (this.resultsContent) {
+                const lastMessage = this.resultsContent.querySelector('.chat-message:last-child');
+                if (lastMessage) {
+                    lastMessage.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                } else {
+                    this.resultsContent.scrollTop = this.resultsContent.scrollHeight;
+                }
+            }
+            this.updateWindowSize();
+        }, 100);
+    }
+
     // 🚀 NEW AGENTIC METHODS
 
     async loadAgenticData() {
@@ -965,7 +1059,9 @@ class FloatingAssistantUI {
 }
 
 // Initialize the UI when DOM is loaded
+// Initialize the UI when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     const ui = new FloatingAssistantUI();
-    ui.init().catch(err => console.error('ui.init error', err));
+    // ui.init() is called in constructor
+    window.ui = ui; // Expose for global access if needed (e.g. for onchange handlers)
 })
